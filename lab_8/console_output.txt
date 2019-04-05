@@ -1,0 +1,778 @@
+﻿> #########################################################################
+> # Lab 8: ERGM LAB
+> #########################################################################
+> # Lab goals: 
+> # 1) To create ERGM models
+> # 2) To compare ERGM models
+> # 3) Consider ERGM performance complications 
+> ##########################################################################
+> 
+> 
+> # NOTE: if you have trouble because some packages are not installed, 
+> # see lab 1 for instructions on how to install all necessary packages.
+> 
+> #outline
+> #1) ERGM creation
+> #2) MCMC diagnostics
+> #3) ERGM model simulation
+> #4) Model comparison
+> #5) ERGM performance improvements
+> 
+> 
+> # load the "ergm" library
+> library(ergm)
+Loading required package: network
+Classes for Relational Data
+Version 1.4-1 created on July 26, 2008.
+copyright (c) 2005, Carter T. Butts, University of California-Irvine
+                    Mark S. Handcock, University of Washington
+                    David R. Hunter, Penn State University
+                    Martina Morris, University of Washington
+For citation information, type citation("network").
+Type help("network-package") to get started.
+
+Attaching package: 'network'
+
+
+	The following object(s) are masked from package:Hmisc :
+
+	 is.discrete 
+
+
+	The following object(s) are masked from package:plyr :
+
+	 is.discrete 
+
+
+	The following object(s) are masked from package:sna :
+
+	 %c% 
+
+
+ergm: Fit, Simulate and Diagnose Exponential-Family Models for
+Networks 
+Version 2.2-2 created on 2010-01-13 
+copyright (c) 2003, Mark S. Handcock, University of Washington
+                    David R. Hunter, Penn State University
+                    Carter T. Butts, University of California-Irvine
+                    Steven M. Goodreau, University of Washington
+                    Martina Morris, University of Washington
+Type help(package="ergm") to get started.
+
+Based on "statnet" project software (http://statnetproject.org).
+ For license and citation information see http://statnetproject.org/attribution
+ or type citation("ergm").
+
+Attaching package: 'ergm'
+
+
+	The following object(s) are masked from package:Hmisc :
+
+	 summary.formula 
+
+> 
+> ## Load the data:
+> data(studentnets.ergm173, package = "NetData")
+> 
+> # The IDs in the data correspond to IDs in the complete dataset. 
+> # To execute the ERGM, R requires continuous integer IDs: [1:n],
+> # where n is the total number of nodes in the ERGM. So, create
+> # node IDs acceptable to R and map these to the edges.
+> 
+> # Create 22 unique and sequenced IDs
+> id <- seq(1,22,1)
+> 
+> # Join these IDs to the nodes data (cbind = column bind), and
+> # reassign this object to 'nodes'
+> nodes<-cbind(id, nodes)
+> 
+> # Check the new nodes data to see what we've got.  Notice that we
+> # now have integer-increasing IDs as a vector in our data frame.  
+> nodes
+   id std_id gnd grd rce per_cap_inc
+1   1 104456   2  10   4        4342
+2   2 113211   2  10   1       13452
+3   3 114144   1  10   4       13799
+4   4 114992   1  10   4       13138
+5   5 118466   1  10   2        8387
+6   6 118680   2  10   4        9392
+7   7 122713   2  10   4       12471
+8   8 122714   1  10   1       10391
+9   9 122723   1  10   4       17524
+10 10 125522   1  10   4       12145
+11 11 126101   2  10   1        8622
+12 12 126784   2  10   3       17524
+13 13 128033   2  10   4       11651
+14 14 128041   1  10   4       10116
+15 15 132942   2  10   4       12452
+16 16 134494   1  10   4        5255
+17 17 138966   2  10   3        7427
+18 18 139441   2  10   3       11933
+19 19 139596   2  10   4        8509
+20 20 140270   1  10   4       12145
+21 21 140271   2  10   4        9121
+22 22 140442   1  10   3        7949
+> 
+> # Merge the new IDs from nodes with the ego_id and alter_id values
+> # in edges. Between merge steps, rename variables to maintain
+> # consistency.  Note that you should check each data step using
+> # earlier syntax.  Note that R requires the same ordering for node
+> # and edge-level data by ego_id.  The following sequence preserves
+> # the edgelist ordering, rendering it consistent with the 
+> # node ordering.
+> edges2<-merge(nodes[,1:2], edges, by.x = "std_id", by.y="alter_id")
+> 
+> # Note that we lose some observations here.  This is because the
+> # alter_id values do not exist in the node list.  Search will
+> # indicate that these IDs are also not in the set of ego_id values.
+> names(edges2)[1]<-"alter_id"
+> 
+> # just assigning new names to first column.
+> names(edges2)[2]<-"alter_R_id"
+> edges3<- merge(nodes[,1:2], edges2, by.x = "std_id", by.y="ego_id")
+> 
+> # shows that we merged new alter id that reflects 
+> # integer id which R requires.
+> names(edges3)[1]<-"ego_id"
+> names(edges3)[2]<-"ego_R_id"
+> 
+> # The edges3 dataset now contains integer-increasing IDs sorted by
+> # ego_R_id. For our work, we will use the ego_R_id and alter_R_id
+> # values, but we retain the std_id values for reference.
+> 
+> # Specify the network we'll call net - where dyads 
+> # are the unit of analysis...
+> net<-network(edges3[,c("ego_R_id", "alter_R_id")])
+> 
+> # Assign edge-level attributes - dyad attributes
+> set.edge.attribute(net, "ego_R_id", edges[,2])
+> set.edge.attribute(net, "alter_R_id", edges[,4])
+> 
+> # Assign node-level attributes to actors in "net"
+> net %v% "gender" <- nodes[,3]
+> net %v% "grade" <- nodes[,4]
+> net %v% "race" <- nodes[,5]
+> net %v% "pci" <- nodes[,6]
+> 
+> # Review some summary information regarding the network to make
+> # sure we have #specified things correctly.  
+> summary(net)
+Network attributes:
+ vertices = 22
+ directed = TRUE
+ hyper = FALSE
+ loops = FALSE
+ multiple = FALSE
+ bipartite = FALSE
+ total edges = 144 
+   missing edges = 0 
+   non-missing edges = 144 
+ density = 0.3117 
+
+Vertex attributes:
+
+ gender:
+   integer valued attribute
+   22values
+
+ grade:
+   integer valued attribute
+   22values
+
+ pci:
+   integer valued attribute
+   22values
+
+ race:
+   integer valued attribute
+   22values
+ vertex.names:
+   character valued attribute
+   22 valid vertex names
+
+Edge attributes:
+
+ alter_R_id:
+   integer valued attribute
+   144values
+
+ ego_R_id:
+   integer valued attribute
+   144values
+
+Network edgelist matrix:
+       [,1] [,2]
+  [1,]    1   10
+  [2,]    1   12
+  [3,]    1   19
+  [4,]    1    1
+  [5,]    1    7
+  [6,]    1   11
+  [7,]    1   15
+  [8,]    1   18
+  [9,]    1    6
+ [10,]    1    9
+ [11,]    1   17
+ [12,]    1    4
+ [13,]    1   22
+ [14,]    2   11
+ [15,]    2    7
+ [16,]    2   15
+ [17,]    3   11
+ [18,]    3    6
+ [19,]    3   19
+ [20,]    3    3
+ [21,]    4    4
+ [22,]    4    1
+ [23,]    4    7
+ [24,]    4   11
+ [25,]    4   19
+ [26,]    4   21
+ [27,]    5    5
+ [28,]    5   14
+ [29,]    5   18
+ [30,]    5   12
+ [31,]    5   16
+ [32,]    6    3
+ [33,]    6    6
+ [34,]    6   12
+ [35,]    7    9
+ [36,]    7    7
+ [37,]    8    8
+ [38,]    8   11
+ [39,]    8   13
+ [40,]    8   16
+ [41,]    9   11
+ [42,]    9   10
+ [43,]    9   16
+ [44,]    9   15
+ [45,]    9    9
+ [46,]    9   17
+ [47,]    9   19
+ [48,]    9    7
+ [49,]   10   10
+ [50,]   10   19
+ [51,]   10   13
+ [52,]   10    9
+ [53,]   10   17
+ [54,]   10   20
+ [55,]   11   11
+ [56,]   11    8
+ [57,]   11   18
+ [58,]   11   16
+ [59,]   11   15
+ [60,]   11    2
+ [61,]   11    9
+ [62,]   11   17
+ [63,]   12    1
+ [64,]   12   13
+ [65,]   12    7
+ [66,]   12    9
+ [67,]   12   10
+ [68,]   12   19
+ [69,]   12   17
+ [70,]   12    6
+ [71,]   12   16
+ [72,]   12    2
+ [73,]   12    5
+ [74,]   12   15
+ [75,]   12   21
+ [76,]   13   21
+ [77,]   13   13
+ [78,]   13   10
+ [79,]   13    9
+ [80,]   13    8
+ [81,]   14   17
+ [82,]   14    5
+ [83,]   14   11
+ [84,]   14   19
+ [85,]   14   16
+ [86,]   15   19
+ [87,]   15    1
+ [88,]   15   15
+ [89,]   15   11
+ [90,]   15    9
+ [91,]   15    2
+ [92,]   15   18
+ [93,]   15   21
+ [94,]   15   12
+ [95,]   15    7
+ [96,]   15   17
+ [97,]   16   12
+ [98,]   16   16
+ [99,]   16   15
+[100,]   16    9
+[101,]   16   11
+[102,]   16   18
+[103,]   16   13
+[104,]   16   14
+[105,]   16   17
+[106,]   16   20
+[107,]   16    8
+[108,]   16    5
+[109,]   17   22
+[110,]   17   17
+[111,]   18   16
+[112,]   18   11
+[113,]   18   22
+[114,]   18   18
+[115,]   18   17
+[116,]   18   15
+[117,]   18    5
+[118,]   19    7
+[119,]   19    3
+[120,]   19   10
+[121,]   19   19
+[122,]   19    1
+[123,]   19   15
+[124,]   19   16
+[125,]   19    9
+[126,]   20   18
+[127,]   20   16
+[128,]   20   20
+[129,]   20   19
+[130,]   20   11
+[131,]   20   10
+[132,]   20   21
+[133,]   21   20
+[134,]   21   12
+[135,]   21   15
+[136,]   21   13
+[137,]   22   18
+[138,]   22   11
+[139,]   22    5
+[140,]   22    9
+[141,]   22   19
+[142,]   22   17
+[143,]   22   15
+[144,]   22   22
+> 
+> # Let's take a look at the network.
+> pdf("1.1_lab8_network.pdf")
+> plot(net)
+> dev.off()
+null device 
+          1 
+> 
+> # Let's execute a model in which we attempt to explain semester 2
+> # friendship selections exclusively with node-level
+> # characteristics.
+> m1<-ergm(net ~ edges + mutual + nodematch("gender") + absdiff
++ 	("pci"),burnin=15000,MCMCsamplesize=30000,verbose=FALSE)
+[1] "Warning:  This network contains loops"
+Iteration 1 of at most 3: the log-likelihood improved by < 0.0001 
+Iteration 2 of at most 3: the log-likelihood improved by 0.0003 
+Iteration 3 of at most 3: the log-likelihood improved by 0.0004 
+
+This model was fit using MCMC.  To examine model diagnostics and check for degeneracy, use the mcmc.diagnostics() function.
+> 
+> # The ERGM runs by an MCMC process with multiple starts, and this
+> # helps you see if the model is converging.  If the estimated
+> # coefficient values were to change dramatically, it might be a
+> # sign of a poorly specified model).  You should see the 
+> # log-likelihood increase with each iteration.
+> 
+> # You will see a loop warning.  You can ignore this for now.
+> 
+> # Before trying to interpret the data, it is a good idea to check
+> # the MCMC process
+> pdf("1.2_lab8_mcmc_m1.pdf")
+> mcmc.diagnostics(m1)
+
+Correlations of sample statistics:
+, , cor
+
+                  edges mutual nodematch.gender absdiff.pci
+edges            1.0000 0.8561           0.6877      0.8299
+mutual           0.8561 1.0000           0.5910      0.7569
+nodematch.gender 0.6877 0.5910           1.0000      0.5869
+absdiff.pci      0.8299 0.7569           0.5869      1.0000
+
+, , lag1
+
+                  edges mutual nodematch.gender absdiff.pci
+edges            0.8268 0.7749           0.5708      0.6981
+mutual           0.7721 0.8602           0.5337      0.6901
+nodematch.gender 0.5672 0.5341           0.8303      0.4927
+absdiff.pci      0.6970 0.6906           0.4943      0.8516
+
+
+r=0.0125 and 0.9875:
+
+Quantile (q) = 0.025
+Accuracy (r) = +/- 0.0125
+Probability (s) = 0.95 
+                                                                            
+                  Burn-in  Total   Lower bound  Dependence enough   enough  
+                  (M)      (N)     (Nmin)       factor (I) burn-in? samples?
+ edges            9900     1796400 600          10800      yes      yes     
+ mutual           15300    1851300 600          17000       no      yes     
+ nodematch.gender 12000    2392800 600          13200      yes      yes     
+ absdiff.pci      10800    1023600 600          12000      yes      yes     
+
+> dev.off()
+null device 
+          1 
+> 
+> # You will see several plots and output.  The plots to the right
+> # should look approximatly normal. The output tells us three
+> # things of interest: 
+> 
+> # 1) The accuracy of the model (r)
+> # 2) If we used a sufficently large burn-in
+> # 3) If we used a sufficently large sample in the simulation
+> 
+> # In our case the samples might be too small.  This doesn't mean
+> # the resutls of the ERGM results are wrong, but we should take
+> # care in specifying the sample size.
+> 
+> # Letâ€™s look at the summary of the results.  We could create a new
+> # object that is the summary score info, but here weâ€™ll just send
+> # it to the screen.
+> 
+> # Let's assess the model
+> summary(m1)
+
+==========================
+Summary of model fit
+==========================
+
+Formula:   net ~ edges + mutual + nodematch("gender") + absdiff("pci")
+
+Newton-Raphson iterations:  16 
+MCMC sample of size 30000 
+
+Monte Carlo MLE Results:
+                  Estimate Std. Error MCMC s.e. p-value    
+edges            -2.31e+00   2.19e-01      0.01 < 1e-04 ***
+mutual            2.41e+00   3.55e-01      0.01 < 1e-04 ***
+nodematch.gender  1.57e-02   1.74e-01   3.1e-03 0.92780    
+absdiff.pci       1.11e-04   3.11e-05   1.9e-07 0.00038 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1 
+
+    Null  Deviance: 640.47  on 462  degrees of freedom
+ Residual Deviance: 417.15  on 458  degrees of freedom
+          Deviance: 223.31  on   4  degrees of freedom
+ 
+AIC: 425.15    BIC: 441.7 
+> 
+> # show the exp() for the ERGM coefficients
+> lapply(m1[1],exp)
+$coef
+           edges           mutual nodematch.gender      absdiff.pci 
+         0.09883         11.16162          1.01587          1.00011 
+
+> 
+> # The first section gives the model (formula) estimated in the
+> # ERGM. Here we said that the network was a function of edges, 
+> # mutual ties and matching with respect gender.  Another way 
+> # to think about this, is that weâ€™re generating random networks
+> # that match the observed network with respect to the number of
+> # edges, the number of mutual dyads, the number of ties within
+> # between race and within/between gender. 
+> 
+> # The second section tells how many iterations were done.  The
+> # MCMC sample size is the number of random networks generated in
+> # the production of the estimate. 
+> 
+> # The next section gives the coefficients, their SEs and pValues.  
+> # These are on a log-odds scale, so we interpret them like logit
+> # coefficients.  
+> 
+> # An edges value of -2.314 means that the odds of seeing a tie on
+> # any dyad are exp(-2.314) ~= 0.098, which could be thought of as
+> # density â€œnetâ€� of the other factors in the model. If you only
+> # have â€˜edgesâ€™ in the model, then exp(b1) should be very close to
+> # the observed density. Edges are equivalent to a model intercept
+> # -- while possible, I canâ€™t imagine why one would estimate a
+> # model without an edges parameter.
+> 
+> # A mutual value of 2.412 means that reciprocity is more common
+> # than expected by chance (positive and significant), and here we
+> # see that exp(2.412)=11.15, so itâ€™s much more likely than chance
+> # -- we are 11 times as likely to see a tie from ij if ji than if
+> # j did not nominate i.
+> 
+> # We are exp(1.574e-02)=1.015 times more likely to nominate within
+> # gender than across gender.
+> 
+> # The final section refers to overall model fit and MCMC
+> # diagnostic statistics (AIC, BIC).
+> 
+> # Let's now create a couple of additional networks so that we can
+> # add earlier friendships and seating proximity to our model. 
+> # We'll do this 2 different ways.  For seating, we'll create an
+> # entirely new network.  For friend_sem1, we'll assign additional 
+> # attributes to the original network.  These are interchangeable.   
+> seat <- net
+> 
+> # Assign an edge-level attribute of 'seat' to capture the network
+> # of seating we create a proximity network via seating location...
+> set.edge.attribute(seat, "seat_net", edges3[,7])
+> 
+> # Assign an edge-level attribute of 'net' to capture sem1
+> # friendships.
+> set.edge.attribute(net, "friend1", edges3[,5])
+> 
+> # Note: thus far, weâ€™ve treated gender as a homogenous matching
+> # parameter.  We can alternatively allow this effect to vary
+> # across grades.  Do this by adding a â€œdiff=TRUEâ€� option for the
+> # nodematch term.  Many terms have options that change their
+> # effect, so look at the help files to clarify.
+> 
+> # Create variables to represent sem1 mutuality and transitivity
+> # Create a new network based on the sem1 friendships.  Use the
+> # network commands to convert this to a matrix.
+> test<-edges["sem1_friend">=1,]
+> 
+> test2<-merge(nodes[,1:2], test, by.x = "std_id", by.y="alter_id")
+> names(test2)[1]<-"alter_id"
+> names(test2)[2]<-"alter_R_id"
+> test3<- merge(nodes[,1:2], test2, by.x = "std_id", by.y="ego_id")
+> names(test3)[1]<-"ego_id"
+> names(test3)[2]<-"ego_R_id"
+> net1<-network(test3[,c("ego_R_id", "alter_R_id")])
+> 
+> A<-as.matrix(net1)
+> B<-t(as.matrix(net1)) #B = A transpose
+> mut_mat <- A + B
+> lag_mut<-as.network(mut_mat) # relies on dichotomous
+>                              # interpretation of edges
+> 
+> # Calculate sem1 transitivity using A matrix from above
+> # This is highly colienar with our response variable and will
+> # cause the ERGM to fail. For a different network, you would use
+> # the code below to calculate semester 1 transitvity:
+> # sqA<-A%*%A #matrix multiplication
+> # sem2_trans<-sqA*A #element-wise multiplication
+> # sem2_trans_net <- as.network(sem2_trans)
+> 
+> # Create another model that uses the sem1 mutuality 
+> m2<-ergm(net ~ edges + mutual + nodematch("gender") + 
++ 	nodematch("race")  + edgecov(lag_mut),burnin=20000,
++ 	MCMCsamplesize=70000,verbose=FALSE,seed=25,
++ 	calc.mcmc.se = FALSE,maxit=6)
+[1] "Warning:  This network contains loops"
+Iteration 1 of at most 6: the log-likelihood improved by 0.9887 
+Iteration 2 of at most 6: the log-likelihood improved by 5.186 
+Iteration 3 of at most 6: the log-likelihood improved by 19.16 
+Iteration 4 of at most 6: the log-likelihood improved by 0.4911 
+Iteration 5 of at most 6: the log-likelihood improved by 18.73 
+Iteration 6 of at most 6: the log-likelihood improved by 18.92 
+
+This model was fit using MCMC.  To examine model diagnostics and check for degeneracy, use the mcmc.diagnostics() function.
+> 
+> pdf("1.3_lab8_mcmc_m2.pdf")
+> mcmc.diagnostics(m4)
+Error in mcmc.diagnostics(m4) : object 'm4' not found
+> dev.off()
+null device 
+          1 
+> 
+> summary(m2)
+
+==========================
+Summary of model fit
+==========================
+
+Formula:   net ~ edges + mutual + nodematch("gender") + nodematch("race") + 
+    edgecov(lag_mut)
+
+Newton-Raphson iterations:  4 
+MCMC sample of size 70000 
+
+Monte Carlo MLE Results:
+                 Estimate Std. Error MCMC s.e. p-value    
+edges             -18.882     56.822        NA    0.74    
+mutual            -21.272     28.449        NA    0.46    
+nodematch.gender    3.870      0.890        NA  <1e-04 ***
+nodematch.race      4.079      0.998        NA  <1e-04 ***
+edgecov.lag_mut    37.384     28.449        NA    0.19    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1 
+
+Warning:  The standard errors are suspect due to possible poor convergence.
+
+    Null  Deviance: 640.47  on 462  degrees of freedom
+ Residual Deviance: 119.19  on 457  degrees of freedom
+          Deviance: 521.28  on   5  degrees of freedom
+ 
+AIC: 129.19    BIC: 149.87 
+> # We might get a warning here.  This means that R was unable to
+> # compute standard errors for all predictors.  This could be due
+> # to a number of causes for the purpose of this example we ignore
+> # the waring and move on, but in your work you will want to check
+> # your data for potential problems
+> 
+> # Now letâ€™s look at goodness of fit.  In addition to the standard
+> # GOF statistics, we can use the simulation features of the
+> # program to see if our models â€œmatchâ€� reality.  Since the models
+> # are effectively proposals about what is driving the observed
+> # network, we can â€˜back predictâ€™ from the model to produce a set
+> # of random networks that are draws from the distribution of
+> # networks implied by the model.  We can then compare the
+> # predicted model to the observed model for features not built
+> # into the model.  So, for example, if the only features 
+> # generating the global network in reality are mixing by grade and 
+> # race, then we should get matching levels of transitivity,
+> # geodesic distances and so forth with the predicted model.  The
+> # tools for doing this are (a) to simulate from the model and (b)
+> # to use the built in GOF functions.
+> 
+> # (a) simulating networks from an estimated model
+> # The higher the value of nsim the longer this will take
+> m2.sim<-simulate(m2,nsim=100);
+> 
+> simnet1<-m2.sim$networks[[1]]
+> summary(simnet1)
+Network attributes:
+ vertices = 22
+ directed = TRUE
+ hyper = FALSE
+ loops = FALSE
+ multiple = FALSE
+ bipartite = FALSE
+ total edges = 134 
+   missing edges = 0 
+   non-missing edges = 134 
+ density = 0.2900 
+
+Vertex attributes:
+
+ gender:
+   integer valued attribute
+   22values
+
+ grade:
+   integer valued attribute
+   22values
+
+ pci:
+   integer valued attribute
+   22values
+
+ race:
+   integer valued attribute
+   22values
+ vertex.names:
+   character valued attribute
+   22 valid vertex names
+
+No edge attributes
+
+Network adjacency matrix:
+   1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22
+1  0 0 0 1 0 1 1 0 1  1  1  1  0  0  1  0  1  1  1  0  0  1
+2  0 0 0 0 0 0 1 0 0  0  1  1  0  0  1  0  0  0  0  0  0  0
+3  0 0 0 0 0 1 0 0 0  0  1  0  0  0  0  0  0  0  1  0  0  0
+4  1 0 0 0 0 0 0 0 0  0  0  0  0  0  0  0  0  0  1  0  1  0
+5  0 0 0 0 0 0 0 0 0  0  0  0  0  0  0  1  0  1  0  0  0  1
+6  1 0 1 0 0 0 0 0 0  0  0  1  0  0  0  0  0  0  0  0  0  0
+7  1 1 0 1 0 0 0 0 1  0  0  1  0  0  1  0  0  0  1  0  0  0
+8  0 0 0 0 0 0 0 0 0  0  1  0  0  0  0  1  0  0  0  0  0  0
+9  1 0 0 0 0 0 1 0 0  1  1  1  1  0  1  1  0  0  1  0  0  1
+10 1 0 0 0 0 0 0 0 1  0  0  1  1  0  0  0  1  0  1  1  0  0
+11 1 1 0 1 0 0 0 1 0  0  0  0  0  1  1  0  1  0  0  0  0  0
+12 0 1 0 0 1 0 1 0 0  0  0  0  0  0  0  1  1  0  1  0  1  0
+13 0 0 0 0 0 0 0 1 1  1  0  1  0  0  0  1  0  0  0  0  1  0
+14 0 0 0 0 1 0 0 0 0  0  1  0  0  0  0  1  1  0  1  0  0  0
+15 1 1 0 0 0 0 1 0 1  0  0  1  0  0  0  1  1  1  1  0  1  1
+16 0 0 0 0 1 0 0 1 1  0  1  0  1  1  0  0  0  1  0  1  0  0
+17 1 0 0 0 0 0 0 0 1  0  1  1  0  0  1  1  0  1  0  0  0  1
+18 1 0 0 0 0 0 0 0 0  0  1  0  0  0  1  0  1  0  0  0  0  1
+19 1 0 1 1 0 0 1 0 0  1  0  0  0  0  1  1  0  0  0  1  0  0
+20 0 0 0 0 0 0 0 0 0  1  1  0  0  0  0  1  0  1  0  0  0  0
+21 0 0 0 1 0 0 0 0 0  0  0  1  1  0  1  0  0  0  0  1  0  0
+22 1 0 0 0 1 0 0 0 1  0  1  0  0  0  0  0  1  0  1  0  0  0
+> pdf("1.4_lab8_m2_simulation.pdf")
+> plot(m2.sim$networks[[1]],vertex.col="WHITE")
+> dev.off()
+null device 
+          1 
+> 
+> # Note the resulting net looks a lot like what we have estimated.
+> # You could easily simulate, say, 1000 nets from your model and
+> # the write a loop that pulls statistics of interest out of each
+> # one (like centralization or some such), to compare against your
+> # observed network.
+> 
+> #This is, essentially, what the built-in GOF models doâ€¦.
+> 
+> # (b) Generating GOF fits from an estimated model
+> # the built in goodness-of-fit routine is also very useful.
+> m2.gof <- gof(m2~idegree)
+> pdf("1.5_lab8_m2_gof.pdf")
+> plot(m2.gof)
+> dev.off()
+null device 
+          1 
+> 
+> # This figure plots the distribution of simulated popularity (in-
+> # degree) as box-plots, with the observed values overlain.  Here
+> # we see a pretty-good fit, particularly in the middle and tail
+> # regions. Recall that in model 5, popularity is *not* one of the
+> # parameters in the model, so this suggests that with the features
+> # we do include, we can account for the observed degree
+> # distribution.  
+> 
+> # There are also a number of â€˜advancedâ€™ options for running ERGM
+> # models designed to (a) allow one to specify structural
+> # parameters of interest, (b) evaluate the convergence of the
+> # MCMC, and (c) test for â€˜degenerateâ€™ models (models that look
+> # like they fit, but that actually predict an odd portion of the
+> # graph sample space).
+> 
+> 
+> # LAB QUESTIONS:
+> 
+> # 1. On your own, using these variables and the 'summary(<model
+> # name>)' command, explore the model that you believe to the best
+> # one.  Explain its strengths relative to the other models and the
+> # logic that suggests it to you.
+> 
+> # 2. Why don't we use the node-level variable 'grade' for any of
+> # the models?  Using the syntax above as a guide, include 'grade'
+> # in a variant of m1, m1.2, and report the results from R.
+> 
+> # 3. Describe what we did to calculate the mutuality an
+> # transitivity scores.
+> 
+> # 4. Describe the each of the command terms: edgecov, mutual,
+> # edges, nodematch, and absdiff.  
+> # NOTE: the command '
+>  
+> help("ergm-terms")
+starting httpd help server ... done
+> 
+> #will be very useful here.  
+> 
+> ################################
+> #improving ergm performance
+> ################################
+> 
+> # ergm is slow, but modern computers can help a lot.
+> # an ergm model tries to compute the same general result multiple
+> # times we can use many threads to harness the power of multicore
+> # processors we do this with the parallel arguement in ergm
+> 
+> #####WARNING######
+> # if you are not using a multicore processor this will slow down
+> # your analysis for most new computers you should use parallel=4.
+> 
+> # let's run the model 4 again with four threads.
+>  
+> m2_fast<-ergm(net ~ edges + mutual + nodematch("gender") + 
++ 	nodematch("race")  + edgecov(lag_mut),burnin=20000,
++ 	MCMCsamplesize=70000,verbose=FALSE,seed=25,
++ 	calc.mcmc.se = FALSE,maxit=6,parallel=4)
+[1] "Warning:  This network contains loops"
+Iteration 1 of at most 6: the log-likelihood improved by 0.9887 
+Iteration 2 of at most 6: the log-likelihood improved by 5.186 
+Iteration 3 of at most 6: the log-likelihood improved by 19.16 
+Iteration 4 of at most 6: the log-likelihood improved by 0.4911 
+Iteration 5 of at most 6: the log-likelihood improved by 18.73 
+Iteration 6 of at most 6: the log-likelihood improved by 18.92 
+
+This model was fit using MCMC.  To examine model diagnostics and check for degeneracy, use the mcmc.diagnostics() function.
+> 

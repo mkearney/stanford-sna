@@ -1,0 +1,938 @@
+﻿##------ Aug 2, 2010 9:14:54 PM ------##
+
+R version 2.10.1 (2009-12-14)
+Copyright (C) 2009 The R Foundation for Statistical Computing
+ISBN 3-900051-07-0
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> setwd("Y:\\cgi-bin\\sna_drupal\\sna_R_labs\\output\\lab_4")
+> #####################
+> # LAB 4: Centrality #
+> #####################
+> 
+> 
+> # NOTE: if you have trouble because some packages are not installed, 
+> # see lab 1 for instructions on how to install all necessary packages.
+> 
+> 
+> #############################################################
+> # 
+> # Lab 4 
+> #
+> # The purpose of this lab is to acquire centrality measures, 
+> # to determine how they are interrelated, and to discern 
+> # what they mean. 
+> #
+> ##############################################################
+>  
+> ###
+> # 1. SETUP 
+> ###
+> library(igraph)
+> 
+> 
+> ###
+> # 2. LOAD DATA
+> ###
+> 
+> # This lab uses SSL.dat (social interaction) and TSL.dat (task 
+> # interaction) from the S641 Semester 1 class in student_nets.
+> # The class is a biology 2 class at a public high school.
+> 
+> # load data:
+> data(studentnets.S641, package = "NetData")
+> 
+> # Reduce to non-zero edges and build a graph object
+> s641_full_nonzero_edges <- subset(s641_full_data_frame, (social_tie > 0 | task_tie > 0))
+> head(s641_full_nonzero_edges)
+   ego alter social_tie task_tie
+5    1     5      5.625     0.00
+6    1     6      1.500     0.00
+22   1    22      1.875    11.25
+44   2    22      0.375     2.25
+74   4     8      1.875     0.75
+89   5     1      5.250     0.00
+> 
+> s641_full <- graph.data.frame(s641_full_nonzero_edges) 
+> summary(s641_full)
+Vertices: 21 
+Edges: 79 
+Directed: TRUE 
+No graph attributes.
+Vertex attributes: name.
+Edge attributes: social_tie, task_tie.
+> 
+> # Create sub-graphs based on edge attributes and remove isolates
+> s641_social <- delete.edges(s641_full, E(s641_full)[get.edge.attribute(s641_full,name = "social_tie")==0])
+> s641_social <- delete.vertices(s641_social, V(s641_social)[degree(s641_social)==0])
+> summary(s641_social)
+Vertices: 19 
+Edges: 57 
+Directed: TRUE 
+No graph attributes.
+Vertex attributes: name.
+Edge attributes: social_tie, task_tie.
+> 
+> s641_task <- delete.edges(s641_full, E(s641_full)[get.edge.attribute(s641_full,name = "task_tie")==0])
+> s641_task <- delete.vertices(s641_task, V(s641_task)[degree(s641_task)==0])
+> summary(s641_task)
+Vertices: 20 
+Edges: 48 
+Directed: TRUE 
+No graph attributes.
+Vertex attributes: name.
+Edge attributes: social_tie, task_tie.
+> 
+> # Look at the plots for each sub-graph
+> social_layout <- layout.fruchterman.reingold(s641_social)
+> plot(s641_social, layout=social_layout, edge.arrow.size=.5)
+> 
+> # Note: click on the graph and then use the drop down menu to 
+> # save any plot you like -- it will save as a pdf. 
+> 
+> task_layout <- layout.fruchterman.reingold(s641_task)
+> plot(s641_task, layout=task_layout, edge.arrow.size=.5)
+> 
+> # Question #1 - what can you say about network centralization from these graphs?
+> 
+> ###
+> # 3. CALCULATE CENTRALITY MEASURES FOR SOCIAL
+> ###
+> 
+> # Indegree centrality measures how many people direct social 
+> # talk to the individual.
+> indegree_social <- degree(s641_social, mode='in')
+> indegree_social
+ [1] 3 1 1 3 3 1 1 1 2 2 3 1 5 4 7 5 3 5 6
+> 
+> # Outdegree centrality measures how many people the actor directs 
+> # social talk to. 
+> outdegree_social <- degree(s641_social, mode='out')
+> outdegree_social
+ [1] 3 1 1 3 3 1 1 1 2 1 3 1 5 4 6 6 3 4 8
+> 
+> # Closeness is the mean geodesic distance between a given node and
+> # all other nodes with paths from the given node to the other
+> # node. This is close to being the mean shortest path, but 
+> # geodesic distances give higher values for more central nodes.
+> #
+> # In a directed network, we can think of in-closeness centrality
+> # as the average number of steps one would have to go through to
+> # get TO a given node FROM all other reachable nodes in the
+> # network. Out-closeness centrality, not surprisingly, measures
+> # the same thing with the directionality reversed.
+> 
+> # In-closeness centrality
+> incloseness_social <- closeness(s641_social, mode='in')
+> incloseness_social
+ [1] 0.16363636 0.15652174 0.05555556 0.16363636 0.15000000 0.13533835
+ [7] 0.05555556 0.13533835 0.15000000 0.22500000 0.16513761 0.18947368
+[13] 0.17475728 0.16216216 0.17821782 0.17142857 0.16071429 0.17142857
+[19] 0.17647059
+> 
+> # Out-closeness
+> outcloseness_social <- closeness(s641_social, mode='out')
+> outcloseness_social
+ [1] 0.23684211 0.22222222 0.05555556 0.23684211 0.20454545 0.16981132
+ [7] 0.05555556 0.17475728 0.19780220 0.05555556 0.23076923 0.05555556
+[13] 0.25714286 0.22500000 0.23684211 0.25352113 0.22222222 0.24657534
+[19] 0.27272727
+> 
+> # Betweenness centrality measures the number of shortest paths
+> # going through a specific vertex; it is returned by the 
+> # betweenness() function. (Recall that in the previous lab we used 
+> # a related measure called edge betweenness, which is returned by
+> # the edge.betweenness() function.)
+> betweenness_social <- betweenness(s641_social)
+> betweenness_social
+ [1]  24.0000000   0.0000000   0.0000000  24.0000000  28.0000000   0.0000000
+ [7]   0.0000000   0.0000000  28.0000000  15.0000000  52.0000000   0.0000000
+[13]  45.8333333   0.8333333  33.0000000  14.7500000   0.2500000  13.5000000
+[19] 126.8333333
+> 
+> # Eigenvector centrality gives greater weight to a node the more 
+> # it is connected to other highly connected nodes. A node
+> # connected to five high-scoring nodes will have higher 
+> # eigenvector centrality than a node connected to five low-scoring
+> # nodes. Thus, it is often interpreted as measuring a node's
+> # network importance.
+> # 
+> # In directed networks, there are 'In' and 'Out' versions. In
+> # information flow studies, for instance, In-Eigenvector scores
+> # would reflect which nodes are high on receiving information,
+> # while Out-Eigenvector scores would reflect which nodes are high
+> # on broadcasting information.
+> #
+> # For these data, we will simply symmetrize to generate an 
+> # undirected eigenvector centrality score.
+> #
+> # Note that, unlike the other centrality measures, evcent() 
+> # returns a complex object rather than a simple vector. Thus, 
+> # we need to first get the evcent() output and then select the 
+> # eigenvector scores from it.
+> s641_social_undirected <- as.undirected(s641_social, mode='collapse')
+> ev_obj_social <- evcent(s641_social_undirected)
+> eigen_social <- ev_obj_social$vector
+> eigen_social
+ [1]  2.418251e-01  1.735366e-01 -1.190031e-17  2.418251e-01  1.004841e-01
+ [6]  1.530350e-02 -1.190031e-17  2.004592e-02  7.671178e-02  1.807292e-01
+[11]  3.692292e-01  3.605430e-02  7.741214e-01  7.027272e-01  1.000000e+00
+[16]  9.385917e-01  5.482951e-01  8.098439e-01  8.698860e-01
+> 
+> #####
+> # Extra Credit - what code would you write in R 
+> # to get the directed versions of eigenvector centrality?
+> #####
+> 
+> # To get the summary table, we'll construct a data frame with 
+> # the vertices as rows and the centrality scores as columns.
+> # 
+> # Note that the vertex IDs are NOT the same as the first column
+> # of row numbers. This is because we previously removed isolates.
+> central_social <- data.frame(V(s641_social)$name, indegree_social, outdegree_social, incloseness_social, outcloseness_social, betweenness_social, eigen_social)
+> central_social 
+   V.s641_social..name indegree_social outdegree_social incloseness_social
+1                    1               3                3         0.16363636
+2                    2               1                1         0.15652174
+3                    4               1                1         0.05555556
+4                    5               3                3         0.16363636
+5                    6               3                3         0.15000000
+6                    7               1                1         0.13533835
+7                    8               1                1         0.05555556
+8                    9               1                1         0.13533835
+9                   10               2                2         0.15000000
+10                  11               2                1         0.22500000
+11                  12               3                3         0.16513761
+12                  15               1                1         0.18947368
+13                  16               5                5         0.17475728
+14                  17               4                4         0.16216216
+15                  18               7                6         0.17821782
+16                  19               5                6         0.17142857
+17                  20               3                3         0.16071429
+18                  21               5                4         0.17142857
+19                  22               6                8         0.17647059
+   outcloseness_social betweenness_social  eigen_social
+1           0.23684211         24.0000000  2.418251e-01
+2           0.22222222          0.0000000  1.735366e-01
+3           0.05555556          0.0000000 -1.190031e-17
+4           0.23684211         24.0000000  2.418251e-01
+5           0.20454545         28.0000000  1.004841e-01
+6           0.16981132          0.0000000  1.530350e-02
+7           0.05555556          0.0000000 -1.190031e-17
+8           0.17475728          0.0000000  2.004592e-02
+9           0.19780220         28.0000000  7.671178e-02
+10          0.05555556         15.0000000  1.807292e-01
+11          0.23076923         52.0000000  3.692292e-01
+12          0.05555556          0.0000000  3.605430e-02
+13          0.25714286         45.8333333  7.741214e-01
+14          0.22500000          0.8333333  7.027272e-01
+15          0.23684211         33.0000000  1.000000e+00
+16          0.25352113         14.7500000  9.385917e-01
+17          0.22222222          0.2500000  5.482951e-01
+18          0.24657534         13.5000000  8.098439e-01
+19          0.27272727        126.8333333  8.698860e-01
+> 
+> # Now we'll examine the table to find the most central actors 
+> # according to the different measures we have. When looking at
+> # each of these measures, it's a good idea to have your plot on
+> # hand so you can sanity-check the results.
+> plot(s641_social, vertex.size=10, vertex.label=V(s641_social)$name,
++ edge.arrow.size = 0.5, layout=layout.fruchterman.reingold,main='Classroom S641 Social Talk')
+> 
+> # Show table sorted by decreasing indegree. The order() function 
+> # returns a vector in ascending order; the minus sign flips it 
+> # to be descending order. Top actors are 18, 22 and 16.
+> central_social[order(-central_social$indegree_social),] 
+   V.s641_social..name indegree_social outdegree_social incloseness_social
+15                  18               7                6         0.17821782
+19                  22               6                8         0.17647059
+13                  16               5                5         0.17475728
+16                  19               5                6         0.17142857
+18                  21               5                4         0.17142857
+14                  17               4                4         0.16216216
+1                    1               3                3         0.16363636
+4                    5               3                3         0.16363636
+5                    6               3                3         0.15000000
+11                  12               3                3         0.16513761
+17                  20               3                3         0.16071429
+9                   10               2                2         0.15000000
+10                  11               2                1         0.22500000
+2                    2               1                1         0.15652174
+3                    4               1                1         0.05555556
+6                    7               1                1         0.13533835
+7                    8               1                1         0.05555556
+8                    9               1                1         0.13533835
+12                  15               1                1         0.18947368
+   outcloseness_social betweenness_social  eigen_social
+15          0.23684211         33.0000000  1.000000e+00
+19          0.27272727        126.8333333  8.698860e-01
+13          0.25714286         45.8333333  7.741214e-01
+16          0.25352113         14.7500000  9.385917e-01
+18          0.24657534         13.5000000  8.098439e-01
+14          0.22500000          0.8333333  7.027272e-01
+1           0.23684211         24.0000000  2.418251e-01
+4           0.23684211         24.0000000  2.418251e-01
+5           0.20454545         28.0000000  1.004841e-01
+11          0.23076923         52.0000000  3.692292e-01
+17          0.22222222          0.2500000  5.482951e-01
+9           0.19780220         28.0000000  7.671178e-02
+10          0.05555556         15.0000000  1.807292e-01
+2           0.22222222          0.0000000  1.735366e-01
+3           0.05555556          0.0000000 -1.190031e-17
+6           0.16981132          0.0000000  1.530350e-02
+7           0.05555556          0.0000000 -1.190031e-17
+8           0.17475728          0.0000000  2.004592e-02
+12          0.05555556          0.0000000  3.605430e-02
+> 
+> # Outdegree: 22, 18 and 19.
+> central_social[order(-central_social$outdegree_social),] 
+   V.s641_social..name indegree_social outdegree_social incloseness_social
+19                  22               6                8         0.17647059
+15                  18               7                6         0.17821782
+16                  19               5                6         0.17142857
+13                  16               5                5         0.17475728
+14                  17               4                4         0.16216216
+18                  21               5                4         0.17142857
+1                    1               3                3         0.16363636
+4                    5               3                3         0.16363636
+5                    6               3                3         0.15000000
+11                  12               3                3         0.16513761
+17                  20               3                3         0.16071429
+9                   10               2                2         0.15000000
+2                    2               1                1         0.15652174
+3                    4               1                1         0.05555556
+6                    7               1                1         0.13533835
+7                    8               1                1         0.05555556
+8                    9               1                1         0.13533835
+10                  11               2                1         0.22500000
+12                  15               1                1         0.18947368
+   outcloseness_social betweenness_social  eigen_social
+19          0.27272727        126.8333333  8.698860e-01
+15          0.23684211         33.0000000  1.000000e+00
+16          0.25352113         14.7500000  9.385917e-01
+13          0.25714286         45.8333333  7.741214e-01
+14          0.22500000          0.8333333  7.027272e-01
+18          0.24657534         13.5000000  8.098439e-01
+1           0.23684211         24.0000000  2.418251e-01
+4           0.23684211         24.0000000  2.418251e-01
+5           0.20454545         28.0000000  1.004841e-01
+11          0.23076923         52.0000000  3.692292e-01
+17          0.22222222          0.2500000  5.482951e-01
+9           0.19780220         28.0000000  7.671178e-02
+2           0.22222222          0.0000000  1.735366e-01
+3           0.05555556          0.0000000 -1.190031e-17
+6           0.16981132          0.0000000  1.530350e-02
+7           0.05555556          0.0000000 -1.190031e-17
+8           0.17475728          0.0000000  2.004592e-02
+10          0.05555556         15.0000000  1.807292e-01
+12          0.05555556          0.0000000  3.605430e-02
+> 
+> # In-closeness: 11, 15 and 18. 
+> # NOTE: For some reason, this operation returns strange values;
+> # a visual inspection of the plot suggests that 11, 15, and 18
+> # are not central actors at all. This could be a bug.
+> central_social[order(-central_social$incloseness_social),] 
+   V.s641_social..name indegree_social outdegree_social incloseness_social
+10                  11               2                1         0.22500000
+12                  15               1                1         0.18947368
+15                  18               7                6         0.17821782
+19                  22               6                8         0.17647059
+13                  16               5                5         0.17475728
+16                  19               5                6         0.17142857
+18                  21               5                4         0.17142857
+11                  12               3                3         0.16513761
+1                    1               3                3         0.16363636
+4                    5               3                3         0.16363636
+14                  17               4                4         0.16216216
+17                  20               3                3         0.16071429
+2                    2               1                1         0.15652174
+5                    6               3                3         0.15000000
+9                   10               2                2         0.15000000
+6                    7               1                1         0.13533835
+8                    9               1                1         0.13533835
+3                    4               1                1         0.05555556
+7                    8               1                1         0.05555556
+   outcloseness_social betweenness_social  eigen_social
+10          0.05555556         15.0000000  1.807292e-01
+12          0.05555556          0.0000000  3.605430e-02
+15          0.23684211         33.0000000  1.000000e+00
+19          0.27272727        126.8333333  8.698860e-01
+13          0.25714286         45.8333333  7.741214e-01
+16          0.25352113         14.7500000  9.385917e-01
+18          0.24657534         13.5000000  8.098439e-01
+11          0.23076923         52.0000000  3.692292e-01
+1           0.23684211         24.0000000  2.418251e-01
+4           0.23684211         24.0000000  2.418251e-01
+14          0.22500000          0.8333333  7.027272e-01
+17          0.22222222          0.2500000  5.482951e-01
+2           0.22222222          0.0000000  1.735366e-01
+5           0.20454545         28.0000000  1.004841e-01
+9           0.19780220         28.0000000  7.671178e-02
+6           0.16981132          0.0000000  1.530350e-02
+8           0.17475728          0.0000000  2.004592e-02
+3           0.05555556          0.0000000 -1.190031e-17
+7           0.05555556          0.0000000 -1.190031e-17
+> 
+> # Out-closeness: 22, 16, and 19
+> central_social[order(-central_social$outcloseness_social),] 
+   V.s641_social..name indegree_social outdegree_social incloseness_social
+19                  22               6                8         0.17647059
+13                  16               5                5         0.17475728
+16                  19               5                6         0.17142857
+18                  21               5                4         0.17142857
+1                    1               3                3         0.16363636
+4                    5               3                3         0.16363636
+15                  18               7                6         0.17821782
+11                  12               3                3         0.16513761
+14                  17               4                4         0.16216216
+2                    2               1                1         0.15652174
+17                  20               3                3         0.16071429
+5                    6               3                3         0.15000000
+9                   10               2                2         0.15000000
+8                    9               1                1         0.13533835
+6                    7               1                1         0.13533835
+3                    4               1                1         0.05555556
+7                    8               1                1         0.05555556
+10                  11               2                1         0.22500000
+12                  15               1                1         0.18947368
+   outcloseness_social betweenness_social  eigen_social
+19          0.27272727        126.8333333  8.698860e-01
+13          0.25714286         45.8333333  7.741214e-01
+16          0.25352113         14.7500000  9.385917e-01
+18          0.24657534         13.5000000  8.098439e-01
+1           0.23684211         24.0000000  2.418251e-01
+4           0.23684211         24.0000000  2.418251e-01
+15          0.23684211         33.0000000  1.000000e+00
+11          0.23076923         52.0000000  3.692292e-01
+14          0.22500000          0.8333333  7.027272e-01
+2           0.22222222          0.0000000  1.735366e-01
+17          0.22222222          0.2500000  5.482951e-01
+5           0.20454545         28.0000000  1.004841e-01
+9           0.19780220         28.0000000  7.671178e-02
+8           0.17475728          0.0000000  2.004592e-02
+6           0.16981132          0.0000000  1.530350e-02
+3           0.05555556          0.0000000 -1.190031e-17
+7           0.05555556          0.0000000 -1.190031e-17
+10          0.05555556         15.0000000  1.807292e-01
+12          0.05555556          0.0000000  3.605430e-02
+> 
+> # Eigenvector: 18, 19, and 16
+> central_social[order(-central_social$eigen_social),] 
+   V.s641_social..name indegree_social outdegree_social incloseness_social
+15                  18               7                6         0.17821782
+16                  19               5                6         0.17142857
+19                  22               6                8         0.17647059
+18                  21               5                4         0.17142857
+13                  16               5                5         0.17475728
+14                  17               4                4         0.16216216
+17                  20               3                3         0.16071429
+11                  12               3                3         0.16513761
+1                    1               3                3         0.16363636
+4                    5               3                3         0.16363636
+10                  11               2                1         0.22500000
+2                    2               1                1         0.15652174
+5                    6               3                3         0.15000000
+9                   10               2                2         0.15000000
+12                  15               1                1         0.18947368
+8                    9               1                1         0.13533835
+6                    7               1                1         0.13533835
+3                    4               1                1         0.05555556
+7                    8               1                1         0.05555556
+   outcloseness_social betweenness_social  eigen_social
+15          0.23684211         33.0000000  1.000000e+00
+16          0.25352113         14.7500000  9.385917e-01
+19          0.27272727        126.8333333  8.698860e-01
+18          0.24657534         13.5000000  8.098439e-01
+13          0.25714286         45.8333333  7.741214e-01
+14          0.22500000          0.8333333  7.027272e-01
+17          0.22222222          0.2500000  5.482951e-01
+11          0.23076923         52.0000000  3.692292e-01
+1           0.23684211         24.0000000  2.418251e-01
+4           0.23684211         24.0000000  2.418251e-01
+10          0.05555556         15.0000000  1.807292e-01
+2           0.22222222          0.0000000  1.735366e-01
+5           0.20454545         28.0000000  1.004841e-01
+9           0.19780220         28.0000000  7.671178e-02
+12          0.05555556          0.0000000  3.605430e-02
+8           0.17475728          0.0000000  2.004592e-02
+6           0.16981132          0.0000000  1.530350e-02
+3           0.05555556          0.0000000 -1.190031e-17
+7           0.05555556          0.0000000 -1.190031e-17
+> 
+> # let's make a plot or two with these summary statistics
+> 
+> # To visualize these data, we can create a barplot for each
+> # centrality measure. In all cases, the y-axis is the value of
+> # each category and the x-axis is the node number. 
+> barplot(central_social$indegree_social, names.arg=central_social$V.s641_social..name)
+> barplot(central_social$outdegree_social, names.arg=central_social$V.s641_social..name)
+> barplot(central_social$incloseness_social, names.arg=central_social$V.s641_social..name)
+> barplot(central_social$outcloseness_social, names.arg=central_social$V.s641_social..name)
+> barplot(central_social$betweenness_social, names.arg=central_social$V.s641_social..name)
+> barplot(central_social$eigen_social, names.arg=central_social$V.s641_social..name)
+> 
+> # Question #2 - What can we say about the social actors if we compare the bar plots? 
+> # Who seems to run the show in sociable affairs? Who seems to bridge sociable conversations? 
+> 
+> ###
+> # 4. CORRELATIONS BETWEEN CENTRALITY MEASURES
+> ###
+> 
+> # Now we'll compute correlations betwee the columns to determine
+> # how closely these measures of centrality are interrelated. 
+> 
+> # Generate a table of pairwise correlations.
+> cor(central_social[,2:7])
+                    indegree_social outdegree_social incloseness_social
+indegree_social           1.0000000        0.9482820          0.4474301
+outdegree_social          0.9482820        1.0000000          0.3718385
+incloseness_social        0.4474301        0.3718385          1.0000000
+outcloseness_social       0.6939672        0.7201862          0.3865818
+betweenness_social        0.5991529        0.7242923          0.3040817
+eigen_social              0.9429737        0.9047671          0.4440923
+                    outcloseness_social betweenness_social eigen_social
+indegree_social               0.6939672          0.5991529    0.9429737
+outdegree_social              0.7201862          0.7242923    0.9047671
+incloseness_social            0.3865818          0.3040817    0.4440923
+outcloseness_social           1.0000000          0.4781439    0.6753520
+betweenness_social            0.4781439          1.0000000    0.4586893
+eigen_social                  0.6753520          0.4586893    1.0000000
+> 
+> # INTERPRETATION:
+> #
+> # Indegree and outdegree are very closely correlated (rho = 0.95),
+> # indicating that social talk with others is reciprocated (i.e.,
+> # if you talk to others, they tend to talk back to you).
+> # 
+> # The same is not true of incloseness and outcloseness (rho = 
+> # 0.38), indicating that the closeness calculated from inbound
+> # paths is not strongly associated with with closeness from
+> # outbound paths.
+> # 
+> # In- and out-degree are highly correlated with eigenvector
+> # centrality, indicating that the students that talk the most to
+> # others (or, relatedly, are talked to the most by others) are
+> # also the ones that are connected to other highly connected
+> # students -- possibly indicating high density cliques around
+> # these individuals.
+> # 
+> # Betweennes shows the highest corelation with outdegree, follwed
+> # by indegree. In the case of this particular network, it seems
+> # that the individuals that talk to the most others are the
+> # likeliest to serve as bridges between the particular cliques
+> # (see, e.g., 22 in the plot).
+> 
+> 
+> ###
+> # 5. REPEAT FOR TASK TALK
+> ###
+> 
+> # Indegree
+> # We should have 20 entries, indicating 2 isolates. 
+> indegree_task <- degree(s641_task, mode='in')
+> indegree_task
+ [1]  1  1  1  1  1  1  1  1  1  1  2  1  1  2  3  4  3  2  3 17
+> 
+> # Outdegree
+> outdegree_task <- degree(s641_task, mode='out')
+> outdegree_task
+ [1]  1  1  1  1  1  1  1  1  1  1  2  1  1  2  3  4  3  2  3 17
+> 
+> # In-closeness
+> incloseness_task <- closeness(s641_task, mode='in')
+> incloseness_task
+ [1] 0.26027397 0.26027397 0.05263158 0.26027397 0.26027397 0.26027397
+ [7] 0.05263158 0.26027397 0.26027397 0.26027397 0.26388889 0.26027397
+[13] 0.26027397 0.26388889 0.26760563 0.27142857 0.26760563 0.26388889
+[19] 0.26760563 0.33333333
+> 
+> # Out-closeness
+> outcloseness_task <- closeness(s641_task, mode='out')
+> outcloseness_task
+ [1] 0.26027397 0.26027397 0.05263158 0.26027397 0.26027397 0.26027397
+ [7] 0.05263158 0.26027397 0.26027397 0.26027397 0.26388889 0.26027397
+[13] 0.26027397 0.26388889 0.26760563 0.27142857 0.26760563 0.26388889
+[19] 0.26760563 0.33333333
+> 
+> # Betweenness. Note that the closeness measures arent very high
+> # for node 22, but the betweenness is off the charts.
+> betweenness_task <- betweenness(s641_task)
+> betweenness_task
+ [1]   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   2   1   0   0
+[20] 257
+> 
+> # Eigenvector
+> s641_task_undirected <- as.undirected(s641_task, mode='collapse')
+> ev_obj_task <- evcent(s641_task_undirected)
+> eigen_task <-ev_obj_task$vector
+> eigen_task
+ [1] 2.154856e-01 2.154856e-01 1.667947e-17 2.154856e-01 2.154856e-01
+ [6] 2.154856e-01 1.667947e-17 2.154856e-01 2.154856e-01 2.154856e-01
+[11] 3.136051e-01 2.154856e-01 2.154856e-01 2.887339e-01 3.997443e-01
+[16] 4.553413e-01 3.399216e-01 2.887339e-01 3.997443e-01 1.000000e+00
+> 
+> # Generate a data frame with all centrality values
+> central_task <- data.frame(V(s641_task)$name, indegree_task, outdegree_task, incloseness_task, outcloseness_task, betweenness_task, eigen_task)
+> central_task
+   V.s641_task..name indegree_task outdegree_task incloseness_task
+1                  1             1              1       0.26027397
+2                  2             1              1       0.26027397
+3                  4             1              1       0.05263158
+4                  5             1              1       0.26027397
+5                  6             1              1       0.26027397
+6                  7             1              1       0.26027397
+7                  8             1              1       0.05263158
+8                  9             1              1       0.26027397
+9                 10             1              1       0.26027397
+10                11             1              1       0.26027397
+11                13             2              2       0.26388889
+12                14             1              1       0.26027397
+13                15             1              1       0.26027397
+14                16             2              2       0.26388889
+15                17             3              3       0.26760563
+16                18             4              4       0.27142857
+17                19             3              3       0.26760563
+18                20             2              2       0.26388889
+19                21             3              3       0.26760563
+20                22            17             17       0.33333333
+   outcloseness_task betweenness_task   eigen_task
+1         0.26027397                0 2.154856e-01
+2         0.26027397                0 2.154856e-01
+3         0.05263158                0 1.667947e-17
+4         0.26027397                0 2.154856e-01
+5         0.26027397                0 2.154856e-01
+6         0.26027397                0 2.154856e-01
+7         0.05263158                0 1.667947e-17
+8         0.26027397                0 2.154856e-01
+9         0.26027397                0 2.154856e-01
+10        0.26027397                0 2.154856e-01
+11        0.26388889                0 3.136051e-01
+12        0.26027397                0 2.154856e-01
+13        0.26027397                0 2.154856e-01
+14        0.26388889                0 2.887339e-01
+15        0.26760563                0 3.997443e-01
+16        0.27142857                2 4.553413e-01
+17        0.26760563                1 3.399216e-01
+18        0.26388889                0 2.887339e-01
+19        0.26760563                0 3.997443e-01
+20        0.33333333              257 1.000000e+00
+> 
+> # In-degree: 22, 18 and 17
+> central_task[order(-central_task$indegree_task),] 
+   V.s641_task..name indegree_task outdegree_task incloseness_task
+20                22            17             17       0.33333333
+16                18             4              4       0.27142857
+15                17             3              3       0.26760563
+17                19             3              3       0.26760563
+19                21             3              3       0.26760563
+11                13             2              2       0.26388889
+14                16             2              2       0.26388889
+18                20             2              2       0.26388889
+1                  1             1              1       0.26027397
+2                  2             1              1       0.26027397
+3                  4             1              1       0.05263158
+4                  5             1              1       0.26027397
+5                  6             1              1       0.26027397
+6                  7             1              1       0.26027397
+7                  8             1              1       0.05263158
+8                  9             1              1       0.26027397
+9                 10             1              1       0.26027397
+10                11             1              1       0.26027397
+12                14             1              1       0.26027397
+13                15             1              1       0.26027397
+   outcloseness_task betweenness_task   eigen_task
+20        0.33333333              257 1.000000e+00
+16        0.27142857                2 4.553413e-01
+15        0.26760563                0 3.997443e-01
+17        0.26760563                1 3.399216e-01
+19        0.26760563                0 3.997443e-01
+11        0.26388889                0 3.136051e-01
+14        0.26388889                0 2.887339e-01
+18        0.26388889                0 2.887339e-01
+1         0.26027397                0 2.154856e-01
+2         0.26027397                0 2.154856e-01
+3         0.05263158                0 1.667947e-17
+4         0.26027397                0 2.154856e-01
+5         0.26027397                0 2.154856e-01
+6         0.26027397                0 2.154856e-01
+7         0.05263158                0 1.667947e-17
+8         0.26027397                0 2.154856e-01
+9         0.26027397                0 2.154856e-01
+10        0.26027397                0 2.154856e-01
+12        0.26027397                0 2.154856e-01
+13        0.26027397                0 2.154856e-01
+> 
+> # Outdegree: 22, 18 and 17
+> central_task[order(-central_task$outdegree_task),] 
+   V.s641_task..name indegree_task outdegree_task incloseness_task
+20                22            17             17       0.33333333
+16                18             4              4       0.27142857
+15                17             3              3       0.26760563
+17                19             3              3       0.26760563
+19                21             3              3       0.26760563
+11                13             2              2       0.26388889
+14                16             2              2       0.26388889
+18                20             2              2       0.26388889
+1                  1             1              1       0.26027397
+2                  2             1              1       0.26027397
+3                  4             1              1       0.05263158
+4                  5             1              1       0.26027397
+5                  6             1              1       0.26027397
+6                  7             1              1       0.26027397
+7                  8             1              1       0.05263158
+8                  9             1              1       0.26027397
+9                 10             1              1       0.26027397
+10                11             1              1       0.26027397
+12                14             1              1       0.26027397
+13                15             1              1       0.26027397
+   outcloseness_task betweenness_task   eigen_task
+20        0.33333333              257 1.000000e+00
+16        0.27142857                2 4.553413e-01
+15        0.26760563                0 3.997443e-01
+17        0.26760563                1 3.399216e-01
+19        0.26760563                0 3.997443e-01
+11        0.26388889                0 3.136051e-01
+14        0.26388889                0 2.887339e-01
+18        0.26388889                0 2.887339e-01
+1         0.26027397                0 2.154856e-01
+2         0.26027397                0 2.154856e-01
+3         0.05263158                0 1.667947e-17
+4         0.26027397                0 2.154856e-01
+5         0.26027397                0 2.154856e-01
+6         0.26027397                0 2.154856e-01
+7         0.05263158                0 1.667947e-17
+8         0.26027397                0 2.154856e-01
+9         0.26027397                0 2.154856e-01
+10        0.26027397                0 2.154856e-01
+12        0.26027397                0 2.154856e-01
+13        0.26027397                0 2.154856e-01
+> 
+> # Incloseness: 22, 18 and 17
+> central_task[order(-central_task$incloseness_task),] 
+   V.s641_task..name indegree_task outdegree_task incloseness_task
+20                22            17             17       0.33333333
+16                18             4              4       0.27142857
+15                17             3              3       0.26760563
+17                19             3              3       0.26760563
+19                21             3              3       0.26760563
+11                13             2              2       0.26388889
+14                16             2              2       0.26388889
+18                20             2              2       0.26388889
+1                  1             1              1       0.26027397
+2                  2             1              1       0.26027397
+4                  5             1              1       0.26027397
+5                  6             1              1       0.26027397
+6                  7             1              1       0.26027397
+8                  9             1              1       0.26027397
+9                 10             1              1       0.26027397
+10                11             1              1       0.26027397
+12                14             1              1       0.26027397
+13                15             1              1       0.26027397
+3                  4             1              1       0.05263158
+7                  8             1              1       0.05263158
+   outcloseness_task betweenness_task   eigen_task
+20        0.33333333              257 1.000000e+00
+16        0.27142857                2 4.553413e-01
+15        0.26760563                0 3.997443e-01
+17        0.26760563                1 3.399216e-01
+19        0.26760563                0 3.997443e-01
+11        0.26388889                0 3.136051e-01
+14        0.26388889                0 2.887339e-01
+18        0.26388889                0 2.887339e-01
+1         0.26027397                0 2.154856e-01
+2         0.26027397                0 2.154856e-01
+4         0.26027397                0 2.154856e-01
+5         0.26027397                0 2.154856e-01
+6         0.26027397                0 2.154856e-01
+8         0.26027397                0 2.154856e-01
+9         0.26027397                0 2.154856e-01
+10        0.26027397                0 2.154856e-01
+12        0.26027397                0 2.154856e-01
+13        0.26027397                0 2.154856e-01
+3         0.05263158                0 1.667947e-17
+7         0.05263158                0 1.667947e-17
+> 
+> # Outcloseness: 22, 18 and 17
+> central_task[order(-central_task$outcloseness_task),] 
+   V.s641_task..name indegree_task outdegree_task incloseness_task
+20                22            17             17       0.33333333
+16                18             4              4       0.27142857
+15                17             3              3       0.26760563
+17                19             3              3       0.26760563
+19                21             3              3       0.26760563
+11                13             2              2       0.26388889
+14                16             2              2       0.26388889
+18                20             2              2       0.26388889
+1                  1             1              1       0.26027397
+2                  2             1              1       0.26027397
+4                  5             1              1       0.26027397
+5                  6             1              1       0.26027397
+6                  7             1              1       0.26027397
+8                  9             1              1       0.26027397
+9                 10             1              1       0.26027397
+10                11             1              1       0.26027397
+12                14             1              1       0.26027397
+13                15             1              1       0.26027397
+3                  4             1              1       0.05263158
+7                  8             1              1       0.05263158
+   outcloseness_task betweenness_task   eigen_task
+20        0.33333333              257 1.000000e+00
+16        0.27142857                2 4.553413e-01
+15        0.26760563                0 3.997443e-01
+17        0.26760563                1 3.399216e-01
+19        0.26760563                0 3.997443e-01
+11        0.26388889                0 3.136051e-01
+14        0.26388889                0 2.887339e-01
+18        0.26388889                0 2.887339e-01
+1         0.26027397                0 2.154856e-01
+2         0.26027397                0 2.154856e-01
+4         0.26027397                0 2.154856e-01
+5         0.26027397                0 2.154856e-01
+6         0.26027397                0 2.154856e-01
+8         0.26027397                0 2.154856e-01
+9         0.26027397                0 2.154856e-01
+10        0.26027397                0 2.154856e-01
+12        0.26027397                0 2.154856e-01
+13        0.26027397                0 2.154856e-01
+3         0.05263158                0 1.667947e-17
+7         0.05263158                0 1.667947e-17
+> 
+> # Eigenvector: 22, 18 and 17
+> central_task[order(-central_task$eigen_task),] 
+   V.s641_task..name indegree_task outdegree_task incloseness_task
+20                22            17             17       0.33333333
+16                18             4              4       0.27142857
+15                17             3              3       0.26760563
+19                21             3              3       0.26760563
+17                19             3              3       0.26760563
+11                13             2              2       0.26388889
+14                16             2              2       0.26388889
+18                20             2              2       0.26388889
+1                  1             1              1       0.26027397
+2                  2             1              1       0.26027397
+4                  5             1              1       0.26027397
+5                  6             1              1       0.26027397
+6                  7             1              1       0.26027397
+8                  9             1              1       0.26027397
+9                 10             1              1       0.26027397
+10                11             1              1       0.26027397
+12                14             1              1       0.26027397
+13                15             1              1       0.26027397
+3                  4             1              1       0.05263158
+7                  8             1              1       0.05263158
+   outcloseness_task betweenness_task   eigen_task
+20        0.33333333              257 1.000000e+00
+16        0.27142857                2 4.553413e-01
+15        0.26760563                0 3.997443e-01
+19        0.26760563                0 3.997443e-01
+17        0.26760563                1 3.399216e-01
+11        0.26388889                0 3.136051e-01
+14        0.26388889                0 2.887339e-01
+18        0.26388889                0 2.887339e-01
+1         0.26027397                0 2.154856e-01
+2         0.26027397                0 2.154856e-01
+4         0.26027397                0 2.154856e-01
+5         0.26027397                0 2.154856e-01
+6         0.26027397                0 2.154856e-01
+8         0.26027397                0 2.154856e-01
+9         0.26027397                0 2.154856e-01
+10        0.26027397                0 2.154856e-01
+12        0.26027397                0 2.154856e-01
+13        0.26027397                0 2.154856e-01
+3         0.05263158                0 1.667947e-17
+7         0.05263158                0 1.667947e-17
+> 
+> # Look at barplots
+> barplot(central_task$indegree_task, names.arg=central_task$V.s641_task..name)
+> barplot(central_task$outdegree_task, names.arg=central_task$V.s641_task..name)
+> barplot(central_task$incloseness_task, names.arg=central_task$V.s641_task..name)
+> barplot(central_task$outcloseness_task, names.arg=central_task$V.s641_task..name)
+> barplot(central_task$betweenness_task, names.arg=central_task$V.s641_task..name)
+> barplot(central_task$eigen_task, names.arg=central_task$V.s641_task..name)
+> 
+> # Question #3 - What can we say about the social actors if we compare the bar plots? 
+> # Who seems to run the show in task affairs? Who seems to bridge task conversations? 
+> 
+> ###
+> # 6. TASK/SOCIAL CORRELATIONS 
+> ###
+> 
+> # Note that in order to do this, we need to either have no missing
+> # data or use pairwise complete observations.
+> #
+> # It would be nice if the centrality functions padded N/A or zero
+> # data for the isolates, because then the dimensions of the two
+> # matrices would be compatible. But right now we have 19 nodes for 
+> # social interaction and 20 nodes for task interaction. So first 
+> # we have to do some hacky R stuff to make them both have 22
+> # nodes.
+> 
+> # First, we'll extract the node names from the SSL data, using
+> # levels() because it's a factor and converting it to numbers so
+> # we can match with the TSL data. Then we'll repeat for TSL.
+> connectednodes_social = as.numeric(levels(central_social$V.s641_social..name))[central_social$V.s641_social..name]
+> connectednodes_task = as.numeric(levels(central_task$V.s641_task..name))[central_task$V.s641_task..name]
+> 
+> # Check that we did this correctly: SSL should have 19 nodes, and 
+> # TSL should have 20 nodes.
+> length(connectednodes_social) 
+[1] 19
+> length(connectednodes_task) 
+[1] 20
+> 
+> # Extract matches for each data set, take that subset and use
+> # columns 2 through 7 to create the correlation matrix. This 
+> # computes the correlations based only on the actors in both 
+> # graphs (18 in total).
+> cor(central_social[which(connectednodes_social %in% connectednodes_task),2:7], central_task[which(connectednodes_task %in% connectednodes_social),2:7])
+                    indegree_task outdegree_task incloseness_task
+indegree_social         0.5827715      0.5827715        0.4828844
+outdegree_social        0.7405082      0.7405082        0.4892710
+incloseness_social      0.2062057      0.2062057        0.8645480
+outcloseness_social     0.3931247      0.3931247        0.6730453
+betweenness_social      0.8804683      0.8804683        0.4325887
+eigen_social            0.5489725      0.5489725        0.4637872
+                    outcloseness_task betweenness_task eigen_task
+indegree_social             0.4828844        0.3911312  0.7271716
+outdegree_social            0.4892710        0.5870139  0.8218924
+incloseness_social          0.8645480        0.1366851  0.4983746
+outcloseness_social         0.6730453        0.2766534  0.6018555
+betweenness_social          0.4325887        0.8824737  0.8259574
+eigen_social                0.4637872        0.3365687  0.7036670
+> 
+> 
+> # INTERPRETATION:
+> #
+> # eigen_task is correlated with betweenness_social (rho=0.83) and
+> # outdegree (rho=0.82), possibly because those who are
+> # important in talk on tasks also serve as bridges for talk on
+> # social issues and have many outbound ties.
+> #
+> # indegree_task and betweenness_social (rho=0.88), and
+> # outdegree_task and betweenness_social (rho=0.88) are correlated,
+> # possibly because the number of indegree and outdegree ties a
+> # node has with respect to task talk, the more they serve as a
+> # bridge on social talk.
+> #
+> # incloseness_task and incloseness_social (rho=0.86) are
+> # correlated, meaning that those who serve in shortest parths past
+> # on inbound ties are equivalent for both social talk and task
+> # talk, which seems to make sense given the betweenness
+> # correlations with network importance and degree between task and
+> # social talk more interpretations are possible as well.
+> 
+> # Question #4 - What can we infer about s641 from these results? 
+> # What sort of substantive story can we derive from it?

@@ -1,0 +1,1325 @@
+﻿##------ Aug 2, 2010 8:35:47 PM ------##
+
+R version 2.10.1 (2009-12-14)
+Copyright (C) 2009 The R Foundation for Statistical Computing
+ISBN 3-900051-07-0
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> setwd("Y:\\cgi-bin\\sna_drupal\\sna_R_labs\\output\\lab_2")
+> 
+> ### 
+> # 1. SET UP SESSION
+> ###
+> library(igraph)
+> library(NetData)
+> 
+> ### 
+> # 2. LOAD DATA
+> ###
+> 
+> # We would ordinarily need to follow the same proceedure we did for the Krackhardt data
+> # as we did in lab 1; see that lab for detail.
+> 
+> data(kracknets, package = "NetData")
+> 
+> # Reduce to non-zero edges and build a graph object
+> krack_full_nonzero_edges <- subset(krack_full_data_frame, (advice_tie > 0 | friendship_tie > 0 | reports_to_tie > 0))
+> head(krack_full_nonzero_edges)
+   ego alter advice_tie friendship_tie reports_to_tie
+2    1     2          1              1              1
+4    1     4          1              1              0
+8    1     8          1              1              0
+12   1    12          0              1              0
+16   1    16          1              1              0
+18   1    18          1              0              0
+> 
+> krack_full <- graph.data.frame(krack_full_nonzero_edges) 
+> summary(krack_full)
+Vertices: 21 
+Edges: 232 
+Directed: TRUE 
+No graph attributes.
+Vertex attributes: name.
+Edge attributes: advice_tie, friendship_tie, reports_to_tie.
+> 
+> # Set vertex attributes
+> for (i in V(krack_full)) {
++ 	for (j in names(attributes)) {
++ 		krack_full <- set.vertex.attribute(krack_full, j, index=i, attributes[i+1,j])
++ 	}
++ }
+> summary(krack_full)
+Vertices: 21 
+Edges: 232 
+Directed: TRUE 
+No graph attributes.
+Vertex attributes: name, AGE, TENURE, LEVEL, DEPT.
+Edge attributes: advice_tie, friendship_tie, reports_to_tie.
+> 
+> # Create sub-graphs based on edge attributes
+> krack_advice <- delete.edges(krack_full, E(krack_full)[get.edge.attribute(krack_full,name = "advice_tie")==0])
+> summary(krack_advice)
+Vertices: 21 
+Edges: 190 
+Directed: TRUE 
+No graph attributes.
+Vertex attributes: name, AGE, TENURE, LEVEL, DEPT.
+Edge attributes: advice_tie, friendship_tie, reports_to_tie.
+> 
+> krack_friendship <- delete.edges(krack_full, E(krack_full)[get.edge.attribute(krack_full,name = "friendship_tie")==0])
+> summary(krack_friendship)
+Vertices: 21 
+Edges: 102 
+Directed: TRUE 
+No graph attributes.
+Vertex attributes: name, AGE, TENURE, LEVEL, DEPT.
+Edge attributes: advice_tie, friendship_tie, reports_to_tie.
+> 
+> krack_reports_to <- delete.edges(krack_full, E(krack_full)[get.edge.attribute(krack_full,name = "reports_to_tie")==0])
+> summary(krack_reports_to)
+Vertices: 21 
+Edges: 20 
+Directed: TRUE 
+No graph attributes.
+Vertex attributes: name, AGE, TENURE, LEVEL, DEPT.
+Edge attributes: advice_tie, friendship_tie, reports_to_tie.
+> 
+> 
+> ### 
+> # 3. NODE-LEVEL STATISTICS
+> ###
+> 
+> # Compute the indegree and outdegree for each node, first in the 
+> # full graph (accounting for all tie types) and then in each 
+> # tie-specific sub-graph. 
+> deg_full_in <- degree(krack_full, mode="in") 
+> deg_full_out <- degree(krack_full, mode="out") 
+> deg_full_in
+ [1] 15 19  7 10  7 11 14 12  9 10 13 13  5 11  7  9 12 17  7  9 15
+> deg_full_out
+ [1]  7  5 16 12 16  6  8  8 13 16 14  5  7  5 20  4 18 17 12 12 11
+> deg_advice_in <- degree(krack_advice, mode="in") 
+> deg_advice_out <- degree(krack_advice, mode="out") 
+> deg_advice_in
+ [1] 13 18  5  8  5 10 13 10  4  9 11  7  4 10  4  8  9 15  4  8 15
+> deg_advice_out
+ [1]  6  3 15 12 15  1  8  8 13 14  3  2  6  4 20  4  5 17 11 12 11
+> deg_friendship_in <- degree(krack_friendship, mode="in") 
+> deg_friendship_out <- degree(krack_friendship, mode="out") 
+> deg_friendship_in
+ [1]  8 10  5  5  6  2  3  5  6  1  6  8  1  5  4  4  6  4  5  3  5
+> deg_friendship_out
+ [1]  5  3  2  6  7  6  0  1  0  7 13  4  2  2  8  2 18  1  9  2  4
+> deg_reports_to_in <- degree(krack_reports_to, mode="in") 
+> deg_reports_to_out <- degree(krack_reports_to, mode="out") 
+> deg_reports_to_in
+ [1] 0 3 0 0 0 0 4 0 0 0 0 0 0 7 0 0 0 2 0 0 4
+> deg_reports_to_out
+ [1] 1 1 1 1 1 1 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+> # Reachability can only be computed on one vertex at a time. To
+> # get graph-wide statistics, change the value of "vertex"
+> # manually or write a for loop. (Remember that, unlike R objects,
+> # igraph objects are numbered from 0.)
+> # QQQ Let's write a way to compile all these node-level outputs into an exportable excel file. Then I can sort and plot them for the class to look at. It's a useful exercise...I know we could do it in R too, but good to show a few different ways.
+> # MN_QQQ NOT SURE I UNDERSTAND THIS. WE HAVE ONE NODE-LEVEL FEATURE THAT HAS ONE
+> # VALUE PER NODE AND TWO N X N MATRICES. WHAT EXACTLY WOULD WE WANT TO EXPORT?
+> # ***Here it would be great to export simple spreadsheets of node/ vertex by measure - so 21 rows, 1st col = id, 2nd col = indegree full, 3rd col = outdegree full, etc. 
+> # MN_*** Done; see below.
+> 
+> # QQQ I AM NOT SURE I FOLLOW WHAT THE BELOW GENERATES AND WHY WE NEED IT - IS IT BC REACH ONLY OCCURS WITHIN COMPONENTS?
+> # MN_QQQ THIS SHOULD BE RESOLVED. WE NOW GENERATE TWO REACHABILITY MATRICES, 
+> # ONE FOR IN-DIRECTED TIES AND ONE FOR OUT-DIRECTED TIES
+> # ***I Was just looking for network level metrics - so image 4 rows, 1 for each network, then a bunch of columns affording summary metrics of % of nodes reachable, density, avg / stdev geodesic, etc
+> # MN_*** I think we're on the same page. This bit of code computes reachability for each [i, j] pair. The code in Section 3 below computes network-level descriptives for this and other node-level stats.
+> reachability <- function(g, m) {
++ 	reach_mat = matrix(nrow = vcount(g), 
++                        ncol = vcount(g))
++ 	for (i in 1:vcount(g)) {
++ 		reach_mat[i,] = 0
++ 		this_node_reach <- subcomponent(g, (i - 1), mode = m)
++ 
++ 		for (j in 1:(length(this_node_reach))) {
++ 			alter = this_node_reach[j] + 1
++ 			reach_mat[i, alter] = 1
++ 		}
++ 	}
++ 	return(reach_mat)
++ }
+> 
+> reach_full_in <- reachability(krack_full, 'in')
+> reach_full_out <- reachability(krack_full, 'out')
+> reach_full_in
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [2,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [3,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [4,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [5,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [6,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [7,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [8,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [9,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[10,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[11,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[12,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[13,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[14,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[15,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[16,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[17,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[18,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[19,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[20,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[21,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     1     1     1     1     1     1     1     1
+ [2,]     1     1     1     1     1     1     1     1
+ [3,]     1     1     1     1     1     1     1     1
+ [4,]     1     1     1     1     1     1     1     1
+ [5,]     1     1     1     1     1     1     1     1
+ [6,]     1     1     1     1     1     1     1     1
+ [7,]     1     1     1     1     1     1     1     1
+ [8,]     1     1     1     1     1     1     1     1
+ [9,]     1     1     1     1     1     1     1     1
+[10,]     1     1     1     1     1     1     1     1
+[11,]     1     1     1     1     1     1     1     1
+[12,]     1     1     1     1     1     1     1     1
+[13,]     1     1     1     1     1     1     1     1
+[14,]     1     1     1     1     1     1     1     1
+[15,]     1     1     1     1     1     1     1     1
+[16,]     1     1     1     1     1     1     1     1
+[17,]     1     1     1     1     1     1     1     1
+[18,]     1     1     1     1     1     1     1     1
+[19,]     1     1     1     1     1     1     1     1
+[20,]     1     1     1     1     1     1     1     1
+[21,]     1     1     1     1     1     1     1     1
+> reach_full_out
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [2,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [3,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [4,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [5,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [6,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [7,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [8,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [9,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[10,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[11,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[12,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[13,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[14,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[15,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[16,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[17,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[18,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[19,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[20,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[21,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     1     1     1     1     1     1     1     1
+ [2,]     1     1     1     1     1     1     1     1
+ [3,]     1     1     1     1     1     1     1     1
+ [4,]     1     1     1     1     1     1     1     1
+ [5,]     1     1     1     1     1     1     1     1
+ [6,]     1     1     1     1     1     1     1     1
+ [7,]     1     1     1     1     1     1     1     1
+ [8,]     1     1     1     1     1     1     1     1
+ [9,]     1     1     1     1     1     1     1     1
+[10,]     1     1     1     1     1     1     1     1
+[11,]     1     1     1     1     1     1     1     1
+[12,]     1     1     1     1     1     1     1     1
+[13,]     1     1     1     1     1     1     1     1
+[14,]     1     1     1     1     1     1     1     1
+[15,]     1     1     1     1     1     1     1     1
+[16,]     1     1     1     1     1     1     1     1
+[17,]     1     1     1     1     1     1     1     1
+[18,]     1     1     1     1     1     1     1     1
+[19,]     1     1     1     1     1     1     1     1
+[20,]     1     1     1     1     1     1     1     1
+[21,]     1     1     1     1     1     1     1     1
+> 
+> reach_advice_in <- reachability(krack_advice, 'in')
+> reach_advice_out <- reachability(krack_advice, 'out')
+> reach_advice_in
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [2,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [3,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [4,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [5,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [6,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [7,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [8,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [9,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[10,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[11,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[12,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[13,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[14,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[15,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[16,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[17,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[18,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[19,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[20,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[21,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     1     1     1     1     1     1     1     1
+ [2,]     1     1     1     1     1     1     1     1
+ [3,]     1     1     1     1     1     1     1     1
+ [4,]     1     1     1     1     1     1     1     1
+ [5,]     1     1     1     1     1     1     1     1
+ [6,]     1     1     1     1     1     1     1     1
+ [7,]     1     1     1     1     1     1     1     1
+ [8,]     1     1     1     1     1     1     1     1
+ [9,]     1     1     1     1     1     1     1     1
+[10,]     1     1     1     1     1     1     1     1
+[11,]     1     1     1     1     1     1     1     1
+[12,]     1     1     1     1     1     1     1     1
+[13,]     1     1     1     1     1     1     1     1
+[14,]     1     1     1     1     1     1     1     1
+[15,]     1     1     1     1     1     1     1     1
+[16,]     1     1     1     1     1     1     1     1
+[17,]     1     1     1     1     1     1     1     1
+[18,]     1     1     1     1     1     1     1     1
+[19,]     1     1     1     1     1     1     1     1
+[20,]     1     1     1     1     1     1     1     1
+[21,]     1     1     1     1     1     1     1     1
+> reach_advice_out
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [2,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [3,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [4,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [5,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [6,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [7,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [8,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [9,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[10,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[11,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[12,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[13,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[14,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[15,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[16,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[17,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[18,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[19,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[20,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[21,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     1     1     1     1     1     1     1     1
+ [2,]     1     1     1     1     1     1     1     1
+ [3,]     1     1     1     1     1     1     1     1
+ [4,]     1     1     1     1     1     1     1     1
+ [5,]     1     1     1     1     1     1     1     1
+ [6,]     1     1     1     1     1     1     1     1
+ [7,]     1     1     1     1     1     1     1     1
+ [8,]     1     1     1     1     1     1     1     1
+ [9,]     1     1     1     1     1     1     1     1
+[10,]     1     1     1     1     1     1     1     1
+[11,]     1     1     1     1     1     1     1     1
+[12,]     1     1     1     1     1     1     1     1
+[13,]     1     1     1     1     1     1     1     1
+[14,]     1     1     1     1     1     1     1     1
+[15,]     1     1     1     1     1     1     1     1
+[16,]     1     1     1     1     1     1     1     1
+[17,]     1     1     1     1     1     1     1     1
+[18,]     1     1     1     1     1     1     1     1
+[19,]     1     1     1     1     1     1     1     1
+[20,]     1     1     1     1     1     1     1     1
+[21,]     1     1     1     1     1     1     1     1
+> 
+> reach_friendship_in <- reachability(krack_friendship, 'in')
+> reach_friendship_out <- reachability(krack_friendship, 'out')
+> reach_friendship_in
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+ [2,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+ [3,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+ [4,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+ [5,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+ [6,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+ [7,]    1    1    1    1    1    1    1    1    0     1     1     1     1
+ [8,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+ [9,]    1    1    1    1    1    1    0    1    1     1     1     1     1
+[10,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+[11,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+[12,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+[13,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+[14,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+[15,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+[16,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+[17,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+[18,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+[19,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+[20,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+[21,]    1    1    1    1    1    1    0    1    0     1     1     1     1
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     1     1     1     1     1     1     1     1
+ [2,]     1     1     1     1     1     1     1     1
+ [3,]     1     1     1     1     1     1     1     1
+ [4,]     1     1     1     1     1     1     1     1
+ [5,]     1     1     1     1     1     1     1     1
+ [6,]     1     1     1     1     1     1     1     1
+ [7,]     1     1     1     1     1     1     1     1
+ [8,]     1     1     1     1     1     1     1     1
+ [9,]     1     1     1     1     1     1     1     1
+[10,]     1     1     1     1     1     1     1     1
+[11,]     1     1     1     1     1     1     1     1
+[12,]     1     1     1     1     1     1     1     1
+[13,]     1     1     1     1     1     1     1     1
+[14,]     1     1     1     1     1     1     1     1
+[15,]     1     1     1     1     1     1     1     1
+[16,]     1     1     1     1     1     1     1     1
+[17,]     1     1     1     1     1     1     1     1
+[18,]     1     1     1     1     1     1     1     1
+[19,]     1     1     1     1     1     1     1     1
+[20,]     1     1     1     1     1     1     1     1
+[21,]     1     1     1     1     1     1     1     1
+> reach_friendship_out
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [2,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [3,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [4,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [5,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [6,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [7,]    0    0    0    0    0    0    1    0    0     0     0     0     0
+ [8,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [9,]    0    0    0    0    0    0    0    0    1     0     0     0     0
+[10,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[11,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[12,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[13,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[14,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[15,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[16,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[17,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[18,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[19,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[20,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[21,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     1     1     1     1     1     1     1     1
+ [2,]     1     1     1     1     1     1     1     1
+ [3,]     1     1     1     1     1     1     1     1
+ [4,]     1     1     1     1     1     1     1     1
+ [5,]     1     1     1     1     1     1     1     1
+ [6,]     1     1     1     1     1     1     1     1
+ [7,]     0     0     0     0     0     0     0     0
+ [8,]     1     1     1     1     1     1     1     1
+ [9,]     0     0     0     0     0     0     0     0
+[10,]     1     1     1     1     1     1     1     1
+[11,]     1     1     1     1     1     1     1     1
+[12,]     1     1     1     1     1     1     1     1
+[13,]     1     1     1     1     1     1     1     1
+[14,]     1     1     1     1     1     1     1     1
+[15,]     1     1     1     1     1     1     1     1
+[16,]     1     1     1     1     1     1     1     1
+[17,]     1     1     1     1     1     1     1     1
+[18,]     1     1     1     1     1     1     1     1
+[19,]     1     1     1     1     1     1     1     1
+[20,]     1     1     1     1     1     1     1     1
+[21,]     1     1     1     1     1     1     1     1
+> 
+> reach_reports_to_in <- reachability(krack_reports_to, 'in')
+> reach_reports_to_out <- reachability(krack_reports_to, 'out')
+> reach_reports_to_in
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    1    0    0    0    0    0    0    0    0     0     0     0     0
+ [2,]    1    1    0    1    0    0    0    0    0     0     0     0     0
+ [3,]    0    0    1    0    0    0    0    0    0     0     0     0     0
+ [4,]    0    0    0    1    0    0    0    0    0     0     0     0     0
+ [5,]    0    0    0    0    1    0    0    0    0     0     0     0     0
+ [6,]    0    0    0    0    0    1    0    0    0     0     0     0     0
+ [7,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+ [8,]    0    0    0    0    0    0    0    1    0     0     0     0     0
+ [9,]    0    0    0    0    0    0    0    0    1     0     0     0     0
+[10,]    0    0    0    0    0    0    0    0    0     1     0     0     0
+[11,]    0    0    0    0    0    0    0    0    0     0     1     0     0
+[12,]    0    0    0    0    0    0    0    0    0     0     0     1     0
+[13,]    0    0    0    0    0    0    0    0    0     0     0     0     1
+[14,]    0    0    1    0    1    0    0    0    1     0     0     0     1
+[15,]    0    0    0    0    0    0    0    0    0     0     0     0     0
+[16,]    0    0    0    0    0    0    0    0    0     0     0     0     0
+[17,]    0    0    0    0    0    0    0    0    0     0     0     0     0
+[18,]    0    0    0    0    0    0    0    0    0     1     1     0     0
+[19,]    0    0    0    0    0    0    0    0    0     0     0     0     0
+[20,]    0    0    0    0    0    0    0    0    0     0     0     0     0
+[21,]    0    0    0    0    0    1    0    1    0     0     0     1     0
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     0     0     0     0     0     0     0     0
+ [2,]     0     0     1     0     0     0     0     0
+ [3,]     0     0     0     0     0     0     0     0
+ [4,]     0     0     0     0     0     0     0     0
+ [5,]     0     0     0     0     0     0     0     0
+ [6,]     0     0     0     0     0     0     0     0
+ [7,]     1     1     1     1     1     1     1     1
+ [8,]     0     0     0     0     0     0     0     0
+ [9,]     0     0     0     0     0     0     0     0
+[10,]     0     0     0     0     0     0     0     0
+[11,]     0     0     0     0     0     0     0     0
+[12,]     0     0     0     0     0     0     0     0
+[13,]     0     0     0     0     0     0     0     0
+[14,]     1     1     0     0     0     1     1     0
+[15,]     0     1     0     0     0     0     0     0
+[16,]     0     0     1     0     0     0     0     0
+[17,]     0     0     0     1     0     0     0     0
+[18,]     0     0     0     0     1     0     0     0
+[19,]     0     0     0     0     0     1     0     0
+[20,]     0     0     0     0     0     0     1     0
+[21,]     0     0     0     1     0     0     0     1
+> reach_reports_to_out
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    1    1    0    0    0    0    1    0    0     0     0     0     0
+ [2,]    0    1    0    0    0    0    1    0    0     0     0     0     0
+ [3,]    0    0    1    0    0    0    1    0    0     0     0     0     0
+ [4,]    0    1    0    1    0    0    1    0    0     0     0     0     0
+ [5,]    0    0    0    0    1    0    1    0    0     0     0     0     0
+ [6,]    0    0    0    0    0    1    1    0    0     0     0     0     0
+ [7,]    0    0    0    0    0    0    1    0    0     0     0     0     0
+ [8,]    0    0    0    0    0    0    1    1    0     0     0     0     0
+ [9,]    0    0    0    0    0    0    1    0    1     0     0     0     0
+[10,]    0    0    0    0    0    0    1    0    0     1     0     0     0
+[11,]    0    0    0    0    0    0    1    0    0     0     1     0     0
+[12,]    0    0    0    0    0    0    1    0    0     0     0     1     0
+[13,]    0    0    0    0    0    0    1    0    0     0     0     0     1
+[14,]    0    0    0    0    0    0    1    0    0     0     0     0     0
+[15,]    0    0    0    0    0    0    1    0    0     0     0     0     0
+[16,]    0    1    0    0    0    0    1    0    0     0     0     0     0
+[17,]    0    0    0    0    0    0    1    0    0     0     0     0     0
+[18,]    0    0    0    0    0    0    1    0    0     0     0     0     0
+[19,]    0    0    0    0    0    0    1    0    0     0     0     0     0
+[20,]    0    0    0    0    0    0    1    0    0     0     0     0     0
+[21,]    0    0    0    0    0    0    1    0    0     0     0     0     0
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     0     0     0     0     0     0     0     0
+ [2,]     0     0     0     0     0     0     0     0
+ [3,]     1     0     0     0     0     0     0     0
+ [4,]     0     0     0     0     0     0     0     0
+ [5,]     1     0     0     0     0     0     0     0
+ [6,]     0     0     0     0     0     0     0     1
+ [7,]     0     0     0     0     0     0     0     0
+ [8,]     0     0     0     0     0     0     0     1
+ [9,]     1     0     0     0     0     0     0     0
+[10,]     0     0     0     0     1     0     0     0
+[11,]     0     0     0     0     1     0     0     0
+[12,]     0     0     0     0     0     0     0     1
+[13,]     1     0     0     0     0     0     0     0
+[14,]     1     0     0     0     0     0     0     0
+[15,]     1     1     0     0     0     0     0     0
+[16,]     0     0     1     0     0     0     0     0
+[17,]     0     0     0     1     0     0     0     1
+[18,]     0     0     0     0     1     0     0     0
+[19,]     1     0     0     0     0     1     0     0
+[20,]     1     0     0     0     0     0     1     0
+[21,]     0     0     0     0     0     0     0     1
+> 
+> 
+> # Often we want to know path distances between individuals in a network. 
+> # This is often done by calculating geodesics, or shortest paths between
+> # each ij pair. One can symmetrize the data to do this (see lab 1), or 
+> # calculate it for outward and inward ties separately. Averaging geodesics 
+> # for the entire network provides an average distance or sort of cohesiveness
+> # score. Dichotomizing distances reveals reach, and an average of reach for 
+> # a network reveals what percent of a network is connected in some way.
+> # QQQ CAN YOU ALTER THE LAB HERE TO DO A THIRD GRAPH THAT RECIPRICATES ALL TIES (Max value) AND CALCULATES THESE THINGS FOR THAT? 
+> # MN_QQQ NOT SURE I UNDERSTAND... YOU WANT TO SYMMETRIZE ACROSS ANY TIE TYPE?
+> # FOR UNIDIRECTIONAL TIES, WILL THE NEWLY ADDED TIE BE OF THE SAME TYPE AS THE 
+> # EXISTING TIE? OR IS THIS INTENDED TO BE TIE-TYPE-AGNOSTIC?
+> # ***I just meant that some of the networks are asymmetric and we may want measures / metrics that symmetrize the data first much like we find in UCINET. Again - just thinking about the sorts of operations they'll want to learn.
+> # MN_*** Symmetrization is handled in Lab 1. Do we need something beyond that here?
+> # Compute shortest paths between each pair of nodes. 
+> sp_full_in <- shortest.paths(krack_full, mode='in')
+> sp_full_out <- shortest.paths(krack_full, mode='out')
+> sp_full_in
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    0    1    1    1    1    2    2    2    1     1     1     1     1
+ [2,]    1    0    1    1    1    1    1    1    1     1     1     2     1
+ [3,]    2    2    0    2    2    2    2    2    2     1     1     2     2
+ [4,]    1    2    1    0    2    2    2    1    2     1     1     1     2
+ [5,]    2    2    2    2    0    2    2    2    2     1     1     2     1
+ [6,]    2    1    1    1    1    0    1    1    1     2     2     2     2
+ [7,]    2    1    1    2    1    1    0    1    1     2     1     1     2
+ [8,]    1    2    1    1    1    2    2    0    1     1     1     2     2
+ [9,]    2    2    1    2    1    1    2    2    0     1     1     2     1
+[10,]    2    2    1    1    1    2    2    1    1     0     2     2     2
+[11,]    2    2    1    1    1    2    1    1    1     1     0     2     1
+[12,]    1    2    1    1    2    1    1    2    1     1     1     0     2
+[13,]    2    2    2    2    1    3    2    2    2     1     1     3     0
+[14,]    2    2    1    2    1    2    1    2    1     2     2     2     1
+[15,]    2    2    2    2    2    2    2    2    2     1     1     2     2
+[16,]    1    2    2    1    1    2    2    2    1     1     2     2     2
+[17,]    2    2    1    1    1    1    1    2    1     1     1     1     2
+[18,]    1    1    1    1    1    2    1    1    1     1     1     2     1
+[19,]    2    2    1    2    1    2    2    2    2     1     1     2     2
+[20,]    2    2    1    1    1    2    2    2    2     1     2     2     2
+[21,]    1    1    1    1    1    1    1    1    1     2     2     1     2
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     2     1     1     1     1     1     1     2
+ [2,]     1     1     1     1     1     1     1     1
+ [3,]     2     1     2     1     1     1     2     1
+ [4,]     2     1     2     1     1     2     2     1
+ [5,]     2     1     2     1     1     1     2     2
+ [6,]     2     1     2     1     2     2     1     1
+ [7,]     1     1     2     1     1     1     2     1
+ [8,]     2     1     2     1     1     2     1     1
+ [9,]     2     1     2     1     1     2     2     2
+[10,]     2     1     1     1     1     1     2     2
+[11,]     2     1     2     1     1     1     1     2
+[12,]     2     1     2     1     2     1     1     1
+[13,]     2     1     2     2     1     2     2     2
+[14,]     0     1     2     1     1     1     1     1
+[15,]     1     0     2     1     1     1     1     2
+[16,]     2     1     0     1     1     2     1     2
+[17,]     2     1     2     0     2     2     1     1
+[18,]     1     1     1     2     0     1     1     1
+[19,]     2     1     2     1     1     0     2     2
+[20,]     2     1     2     1     1     1     0     1
+[21,]     1     1     2     1     1     2     1     0
+> sp_full_out
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    0    1    2    1    2    2    2    1    2     2     2     1     2
+ [2,]    1    0    2    2    2    1    1    2    2     2     2     2     2
+ [3,]    1    1    0    1    2    1    1    1    1     1     1     1     2
+ [4,]    1    1    2    0    2    1    2    1    2     1     1     1     2
+ [5,]    1    1    2    2    0    1    1    1    1     1     1     2     1
+ [6,]    2    1    2    2    2    0    1    2    1     2     2     1     3
+ [7,]    2    1    2    2    2    1    0    2    2     2     1     1     2
+ [8,]    2    1    2    1    2    1    1    0    2     1     1     2     2
+ [9,]    1    1    2    2    2    1    1    1    0     1     1     1     2
+[10,]    1    1    1    1    1    2    2    1    1     0     1     1     1
+[11,]    1    1    1    1    1    2    1    1    1     2     0     1     1
+[12,]    1    2    2    1    2    2    1    2    2     2     2     0     3
+[13,]    1    1    2    2    1    2    2    2    1     2     1     2     0
+[14,]    2    1    2    2    2    2    1    2    2     2     2     2     2
+[15,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[16,]    1    1    2    2    2    2    2    2    2     1     2     2     2
+[17,]    1    1    1    1    1    1    1    1    1     1     1     1     2
+[18,]    1    1    1    1    1    2    1    1    1     1     1     2     1
+[19,]    1    1    1    2    1    2    1    2    2     1     1     1     2
+[20,]    1    1    2    2    2    1    2    1    2     2     1     1     2
+[21,]    2    1    1    1    2    1    1    1    2     2     2     1     2
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     2     2     1     2     1     2     2     1
+ [2,]     2     2     2     2     1     2     2     1
+ [3,]     1     2     2     1     1     1     1     1
+ [4,]     2     2     1     1     1     2     1     1
+ [5,]     1     2     1     1     1     1     1     1
+ [6,]     2     2     2     1     2     2     2     1
+ [7,]     1     2     2     1     1     2     2     1
+ [8,]     2     2     2     2     1     2     2     1
+ [9,]     1     2     1     1     1     2     2     1
+[10,]     2     1     1     1     1     1     1     2
+[11,]     2     1     2     1     1     1     2     2
+[12,]     2     2     2     1     2     2     2     1
+[13,]     1     2     2     2     1     2     2     2
+[14,]     0     1     2     2     1     2     2     1
+[15,]     1     0     1     1     1     1     1     1
+[16,]     2     2     0     2     1     2     2     2
+[17,]     1     1     1     0     2     1     1     1
+[18,]     1     1     1     2     0     1     1     1
+[19,]     1     1     2     2     1     0     1     2
+[20,]     1     1     1     1     1     2     0     1
+[21,]     1     2     2     1     1     2     1     0
+> sp_advice_in <- shortest.paths(krack_advice, mode='in')
+> sp_advice_out <- shortest.paths(krack_advice, mode='out')
+> sp_advice_in
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    0    3    1    1    1    3    2    2    1     1     1     3     1
+ [2,]    1    0    1    1    1    2    1    1    1     1     1     2     1
+ [3,]    2    2    0    2    2    2    2    2    2     1     3     2     2
+ [4,]    1    2    1    0    2    2    2    1    2     1     2     2     2
+ [5,]    2    3    2    2    0    3    2    2    2     1     3     3     1
+ [6,]    2    1    1    1    1    0    1    1    1     2     2     2     2
+ [7,]    2    1    1    2    1    2    0    1    1     2     1     1     2
+ [8,]    1    2    1    1    1    2    2    0    1     1     2     2     2
+ [9,]    2    3    1    2    2    3    2    2    0     2     3     3     1
+[10,]    2    3    1    1    1    3    2    1    1     0     3     3     2
+[11,]    2    2    1    1    1    3    1    1    1     1     0     2     2
+[12,]    2    2    1    1    2    2    1    2    1     2     2     0     2
+[13,]    2    3    2    2    1    3    2    2    2     1     3     3     0
+[14,]    2    2    1    2    1    2    1    2    1     2     2     2     1
+[15,]    2    3    2    2    2    3    2    2    2     1     3     3     2
+[16,]    1    3    2    1    1    3    2    2    1     1     2     3     2
+[17,]    2    2    1    1    1    2    1    2    1     1     2     2     2
+[18,]    1    2    1    1    1    2    1    1    1     1     2     2     1
+[19,]    2    3    2    2    1    3    2    2    2     1     3     3     2
+[20,]    2    2    1    1    1    2    2    2    2     1     3     2     2
+[21,]    1    1    1    1    1    1    1    1    1     2     2     1     2
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     2     1     1     1     1     1     1     2
+ [2,]     1     1     1     1     1     1     1     1
+ [3,]     2     1     2     2     1     1     2     1
+ [4,]     2     1     2     1     1     2     2     1
+ [5,]     2     1     2     3     1     1     2     2
+ [6,]     2     1     2     2     2     2     1     1
+ [7,]     1     1     2     1     1     1     2     1
+ [8,]     2     1     2     2     1     2     1     1
+ [9,]     2     1     2     3     1     2     2     2
+[10,]     2     1     1     2     1     1     2     2
+[11,]     2     1     2     2     1     1     1     2
+[12,]     2     1     3     2     2     2     1     1
+[13,]     2     1     2     3     1     2     2     2
+[14,]     0     1     2     2     1     1     1     1
+[15,]     2     0     2     3     1     1     1     2
+[16,]     2     1     0     2     1     2     1     2
+[17,]     2     1     2     0     2     2     1     1
+[18,]     1     1     1     2     0     1     1     1
+[19,]     2     1     2     3     1     0     2     2
+[20,]     2     1     2     2     1     1     0     1
+[21,]     1     1     2     1     1     2     1     0
+> sp_advice_out
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    0    1    2    1    2    2    2    1    2     2     2     2     2
+ [2,]    3    0    2    2    3    1    1    2    3     3     2     2     3
+ [3,]    1    1    0    1    2    1    1    1    1     1     1     1     2
+ [4,]    1    1    2    0    2    1    2    1    2     1     1     1     2
+ [5,]    1    1    2    2    0    1    1    1    2     1     1     2     1
+ [6,]    3    2    2    2    3    0    2    2    3     3     3     2     3
+ [7,]    2    1    2    2    2    1    0    2    2     2     1     1     2
+ [8,]    2    1    2    1    2    1    1    0    2     1     1     2     2
+ [9,]    1    1    2    2    2    1    1    1    0     1     1     1     2
+[10,]    1    1    1    1    1    2    2    1    2     0     1     2     1
+[11,]    1    1    3    2    3    2    1    2    3     3     0     2     3
+[12,]    3    2    2    2    3    2    1    2    3     3     2     0     3
+[13,]    1    1    2    2    1    2    2    2    1     2     2     2     0
+[14,]    2    1    2    2    2    2    1    2    2     2     2     2     2
+[15,]    1    1    1    1    1    1    1    1    1     1     1     1     1
+[16,]    1    1    2    2    2    2    2    2    2     1     2     3     2
+[17,]    1    1    2    1    3    2    1    2    3     2     2     2     3
+[18,]    1    1    1    1    1    2    1    1    1     1     1     2     1
+[19,]    1    1    1    2    1    2    1    2    2     1     1     2     2
+[20,]    1    1    2    2    2    1    2    1    2     2     1     1     2
+[21,]    2    1    1    1    2    1    1    1    2     2     2     1     2
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     2     2     1     2     1     2     2     1
+ [2,]     2     3     3     2     2     3     2     1
+ [3,]     1     2     2     1     1     2     1     1
+ [4,]     2     2     1     1     1     2     1     1
+ [5,]     1     2     1     1     1     1     1     1
+ [6,]     2     3     3     2     2     3     2     1
+ [7,]     1     2     2     1     1     2     2     1
+ [8,]     2     2     2     2     1     2     2     1
+ [9,]     1     2     1     1     1     2     2     1
+[10,]     2     1     1     1     1     1     1     2
+[11,]     2     3     2     2     2     3     3     2
+[12,]     2     3     3     2     2     3     2     1
+[13,]     1     2     2     2     1     2     2     2
+[14,]     0     2     2     2     1     2     2     1
+[15,]     1     0     1     1     1     1     1     1
+[16,]     2     2     0     2     1     2     2     2
+[17,]     2     3     2     0     2     3     2     1
+[18,]     1     1     1     2     0     1     1     1
+[19,]     1     1     2     2     1     0     1     2
+[20,]     1     1     1     1     1     2     0     1
+[21,]     1     2     2     1     1     2     1     0
+> 
+> sp_friendship_in <- shortest.paths(krack_friendship, mode='in')
+> sp_friendship_out <- shortest.paths(krack_friendship, mode='out')
+> sp_friendship_in
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    0    1    2    1    2    2  Inf    2  Inf     2     1     1     2
+ [2,]    1    0    2    1    1    1  Inf    2  Inf     2     1     2     2
+ [3,]    3    3    0    2    2    2  Inf    3  Inf     1     1     2     2
+ [4,]    1    2    3    0    2    2  Inf    1  Inf     2     1     1     2
+ [5,]    3    3    2    2    0    2  Inf    3  Inf     1     1     2     1
+ [6,]    3    3    3    2    2    0  Inf    3  Inf     3     2     2     3
+ [7,]    3    3    2    2    2    1    0    3  Inf     3     2     2     3
+ [8,]    1    2    3    1    2    2  Inf    0  Inf     1     1     2     2
+ [9,]    3    3    3    2    1    1  Inf    3    0     1     1     2     2
+[10,]    3    3    4    2    2    2  Inf    3  Inf     0     2     2     3
+[11,]    3    3    2    2    1    2  Inf    3  Inf     2     0     2     1
+[12,]    1    2    2    1    2    1  Inf    2  Inf     1     1     0     2
+[13,]    4    4    3    3    2    3  Inf    4  Inf     3     1     3     0
+[14,]    3    3    1    2    1    2  Inf    3  Inf     2     2     2     2
+[15,]    3    3    2    2    2    2  Inf    3  Inf     3     1     2     2
+[16,]    1    2    3    1    2    2  Inf    2  Inf     1     2     2     3
+[17,]    2    2    3    1    1    1  Inf    2  Inf     2     1     1     2
+[18,]    2    1    3    2    2    2  Inf    3  Inf     2     1     2     2
+[19,]    3    3    1    2    1    2  Inf    3  Inf     2     1     2     2
+[20,]    3    3    2    2    2    2  Inf    3  Inf     1     2     2     3
+[21,]    2    1    3    2    1    1  Inf    3  Inf     2     2     1     2
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     2     1     1     1     2     1     2     2
+ [2,]     3     2     1     1     1     1     2     1
+ [3,]     2     1     4     1     4     1     2     2
+ [4,]     3     2     2     1     3     2     2     2
+ [5,]     2     1     4     1     4     1     2     2
+ [6,]     2     1     4     1     4     2     3     2
+ [7,]     1     2     4     1     4     2     3     2
+ [8,]     3     2     2     1     3     2     2     2
+ [9,]     2     1     4     1     4     2     2     2
+[10,]     4     3     4     1     4     3     3     2
+[11,]     2     1     4     1     4     1     1     2
+[12,]     3     2     2     1     3     1     2     1
+[13,]     3     2     5     2     5     2     2     3
+[14,]     0     1     4     1     4     1     3     2
+[15,]     1     0     4     1     4     1     2     2
+[16,]     3     2     0     1     3     2     3     2
+[17,]     3     2     3     0     3     2     2     1
+[18,]     3     2     2     2     0     2     1     1
+[19,]     2     1     4     1     4     0     2     2
+[20,]     3     2     4     1     4     1     0     2
+[21,]     3     2     2     1     2     2     3     0
+> sp_friendship_out
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    0    1    3    1    3    3    3    1    3     3     3     1     4
+ [2,]    1    0    3    2    3    3    3    2    3     3     3     2     4
+ [3,]    2    2    0    3    2    3    2    3    3     4     2     2     3
+ [4,]    1    1    2    0    2    2    2    1    2     2     2     1     3
+ [5,]    2    1    2    2    0    2    2    2    1     2     1     2     2
+ [6,]    2    1    2    2    2    0    1    2    1     2     2     1     3
+ [7,]  Inf  Inf  Inf  Inf  Inf  Inf    0  Inf  Inf   Inf   Inf   Inf   Inf
+ [8,]    2    2    3    1    3    3    3    0    3     3     3     2     4
+ [9,]  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf    0   Inf   Inf   Inf   Inf
+[10,]    2    2    1    2    1    3    3    1    1     0     2     1     3
+[11,]    1    1    1    1    1    2    2    1    1     2     0     1     1
+[12,]    1    2    2    1    2    2    2    2    2     2     2     0     3
+[13,]    2    2    2    2    1    3    3    2    2     3     1     2     0
+[14,]    2    3    2    3    2    2    1    3    2     4     2     3     3
+[15,]    1    2    1    2    1    1    2    2    1     3     1     2     2
+[16,]    1    1    4    2    4    4    4    2    4     4     4     2     5
+[17,]    1    1    1    1    1    1    1    1    1     1     1     1     2
+[18,]    2    1    4    3    4    4    4    3    4     4     4     3     5
+[19,]    1    1    1    2    1    2    2    2    2     3     1     1     2
+[20,]    2    2    2    2    2    3    3    2    2     3     1     2     2
+[21,]    2    1    2    2    2    2    2    2    2     2     2     1     3
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]     3     3     1     2     2     3     3     2
+ [2,]     3     3     2     2     1     3     3     1
+ [3,]     1     2     3     3     3     1     2     3
+ [4,]     2     2     1     1     2     2     2     2
+ [5,]     1     2     2     1     2     1     2     1
+ [6,]     2     2     2     1     2     2     2     1
+ [7,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+ [8,]     3     3     2     2     3     3     3     3
+ [9,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+[10,]     2     3     1     2     2     2     1     2
+[11,]     2     1     2     1     1     1     2     2
+[12,]     2     2     2     1     2     2     2     1
+[13,]     2     2     3     2     2     2     3     2
+[14,]     0     1     3     3     3     2     3     3
+[15,]     1     0     2     2     2     1     2     2
+[16,]     4     4     0     3     2     4     4     2
+[17,]     1     1     1     0     2     1     1     1
+[18,]     4     4     3     3     0     4     4     2
+[19,]     1     1     2     2     2     0     1     2
+[20,]     3     2     3     2     1     2     0     3
+[21,]     2     2     2     1     1     2     2     0
+> 
+> sp_reports_to_in <- shortest.paths(krack_reports_to, mode='in')
+> sp_reports_to_out <- shortest.paths(krack_reports_to, mode='out')
+> sp_reports_to_in
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    0  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf   Inf   Inf   Inf   Inf
+ [2,]    1    0  Inf    1  Inf  Inf  Inf  Inf  Inf   Inf   Inf   Inf   Inf
+ [3,]  Inf  Inf    0  Inf  Inf  Inf  Inf  Inf  Inf   Inf   Inf   Inf   Inf
+ [4,]  Inf  Inf  Inf    0  Inf  Inf  Inf  Inf  Inf   Inf   Inf   Inf   Inf
+ [5,]  Inf  Inf  Inf  Inf    0  Inf  Inf  Inf  Inf   Inf   Inf   Inf   Inf
+ [6,]  Inf  Inf  Inf  Inf  Inf    0  Inf  Inf  Inf   Inf   Inf   Inf   Inf
+ [7,]    2    1    2    2    2    2    0    2    2     2     2     2     2
+ [8,]  Inf  Inf  Inf  Inf  Inf  Inf  Inf    0  Inf   Inf   Inf   Inf   Inf
+ [9,]  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf    0   Inf   Inf   Inf   Inf
+[10,]  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf     0   Inf   Inf   Inf
+[11,]  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf   Inf     0   Inf   Inf
+[12,]  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf   Inf   Inf     0   Inf
+[13,]  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf   Inf   Inf   Inf     0
+[14,]  Inf  Inf    1  Inf    1  Inf  Inf  Inf    1   Inf   Inf   Inf     1
+[15,]  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf   Inf   Inf   Inf   Inf
+[16,]  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf   Inf   Inf   Inf   Inf
+[17,]  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf   Inf   Inf   Inf   Inf
+[18,]  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf     1     1   Inf   Inf
+[19,]  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf   Inf   Inf   Inf   Inf
+[20,]  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf  Inf   Inf   Inf   Inf   Inf
+[21,]  Inf  Inf  Inf  Inf  Inf    1  Inf    1  Inf   Inf   Inf     1   Inf
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+ [2,]   Inf   Inf     1   Inf   Inf   Inf   Inf   Inf
+ [3,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+ [4,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+ [5,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+ [6,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+ [7,]     1     2     2     2     1     2     2     1
+ [8,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+ [9,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+[10,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+[11,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+[12,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+[13,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+[14,]     0     1   Inf   Inf   Inf     1     1   Inf
+[15,]   Inf     0   Inf   Inf   Inf   Inf   Inf   Inf
+[16,]   Inf   Inf     0   Inf   Inf   Inf   Inf   Inf
+[17,]   Inf   Inf   Inf     0   Inf   Inf   Inf   Inf
+[18,]   Inf   Inf   Inf   Inf     0   Inf   Inf   Inf
+[19,]   Inf   Inf   Inf   Inf   Inf     0   Inf   Inf
+[20,]   Inf   Inf   Inf   Inf   Inf   Inf     0   Inf
+[21,]   Inf   Inf   Inf     1   Inf   Inf   Inf     0
+> sp_reports_to_out
+      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13]
+ [1,]    0    1  Inf  Inf  Inf  Inf    2  Inf  Inf   Inf   Inf   Inf   Inf
+ [2,]  Inf    0  Inf  Inf  Inf  Inf    1  Inf  Inf   Inf   Inf   Inf   Inf
+ [3,]  Inf  Inf    0  Inf  Inf  Inf    2  Inf  Inf   Inf   Inf   Inf   Inf
+ [4,]  Inf    1  Inf    0  Inf  Inf    2  Inf  Inf   Inf   Inf   Inf   Inf
+ [5,]  Inf  Inf  Inf  Inf    0  Inf    2  Inf  Inf   Inf   Inf   Inf   Inf
+ [6,]  Inf  Inf  Inf  Inf  Inf    0    2  Inf  Inf   Inf   Inf   Inf   Inf
+ [7,]  Inf  Inf  Inf  Inf  Inf  Inf    0  Inf  Inf   Inf   Inf   Inf   Inf
+ [8,]  Inf  Inf  Inf  Inf  Inf  Inf    2    0  Inf   Inf   Inf   Inf   Inf
+ [9,]  Inf  Inf  Inf  Inf  Inf  Inf    2  Inf    0   Inf   Inf   Inf   Inf
+[10,]  Inf  Inf  Inf  Inf  Inf  Inf    2  Inf  Inf     0   Inf   Inf   Inf
+[11,]  Inf  Inf  Inf  Inf  Inf  Inf    2  Inf  Inf   Inf     0   Inf   Inf
+[12,]  Inf  Inf  Inf  Inf  Inf  Inf    2  Inf  Inf   Inf   Inf     0   Inf
+[13,]  Inf  Inf  Inf  Inf  Inf  Inf    2  Inf  Inf   Inf   Inf   Inf     0
+[14,]  Inf  Inf  Inf  Inf  Inf  Inf    1  Inf  Inf   Inf   Inf   Inf   Inf
+[15,]  Inf  Inf  Inf  Inf  Inf  Inf    2  Inf  Inf   Inf   Inf   Inf   Inf
+[16,]  Inf    1  Inf  Inf  Inf  Inf    2  Inf  Inf   Inf   Inf   Inf   Inf
+[17,]  Inf  Inf  Inf  Inf  Inf  Inf    2  Inf  Inf   Inf   Inf   Inf   Inf
+[18,]  Inf  Inf  Inf  Inf  Inf  Inf    1  Inf  Inf   Inf   Inf   Inf   Inf
+[19,]  Inf  Inf  Inf  Inf  Inf  Inf    2  Inf  Inf   Inf   Inf   Inf   Inf
+[20,]  Inf  Inf  Inf  Inf  Inf  Inf    2  Inf  Inf   Inf   Inf   Inf   Inf
+[21,]  Inf  Inf  Inf  Inf  Inf  Inf    1  Inf  Inf   Inf   Inf   Inf   Inf
+      [,14] [,15] [,16] [,17] [,18] [,19] [,20] [,21]
+ [1,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+ [2,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+ [3,]     1   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+ [4,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+ [5,]     1   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+ [6,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf     1
+ [7,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+ [8,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf     1
+ [9,]     1   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+[10,]   Inf   Inf   Inf   Inf     1   Inf   Inf   Inf
+[11,]   Inf   Inf   Inf   Inf     1   Inf   Inf   Inf
+[12,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf     1
+[13,]     1   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+[14,]     0   Inf   Inf   Inf   Inf   Inf   Inf   Inf
+[15,]     1     0   Inf   Inf   Inf   Inf   Inf   Inf
+[16,]   Inf   Inf     0   Inf   Inf   Inf   Inf   Inf
+[17,]   Inf   Inf   Inf     0   Inf   Inf   Inf     1
+[18,]   Inf   Inf   Inf   Inf     0   Inf   Inf   Inf
+[19,]     1   Inf   Inf   Inf   Inf     0   Inf   Inf
+[20,]     1   Inf   Inf   Inf   Inf   Inf     0   Inf
+[21,]   Inf   Inf   Inf   Inf   Inf   Inf   Inf     0
+> 
+> 
+> # Assemble node-level stats into single data frame for export as CSV.
+> 
+> # First, we have to compute average values by node for reachability and
+> # shortest path. (We don't have to do this for degree because it is 
+> # already expressed as a node-level value.)
+> reach_full_in_vec <- vector()
+> reach_full_out_vec <- vector()
+> reach_advice_in_vec <- vector()
+> reach_advice_out_vec <- vector()
+> reach_friendship_in_vec <- vector()
+> reach_friendship_out_vec <- vector()
+> reach_reports_to_in_vec <- vector()
+> reach_reports_to_out_vec <- vector()
+> 
+> sp_full_in_vec <- vector()
+> sp_full_out_vec <- vector()
+> sp_advice_in_vec <- vector()
+> sp_advice_out_vec <- vector()
+> sp_friendship_in_vec <- vector()
+> sp_friendship_out_vec <- vector()
+> sp_reports_to_in_vec <- vector()
+> sp_reports_to_out_vec <- vector()
+> 
+> for (i in 1:vcount(krack_full)) {
++ 	reach_full_in_vec[i] <- mean(reach_full_in[i,])
++ 	reach_full_out_vec[i] <- mean(reach_full_out[i,])
++ 	reach_advice_in_vec[i] <- mean(reach_advice_in[i,])
++ 	reach_advice_out_vec[i] <- mean(reach_advice_out[i,])
++ 	reach_friendship_in_vec[i] <- mean(reach_friendship_in[i,])
++ 	reach_friendship_out_vec[i] <- mean(reach_friendship_out[i,])
++ 	reach_reports_to_in_vec[i] <- mean(reach_reports_to_in[i,])
++ 	reach_reports_to_out_vec[i] <- mean(reach_reports_to_out[i,])
++ 
++ 	sp_full_in_vec[i] <- mean(sp_full_in[i,])
++ 	sp_full_out_vec[i] <- mean(sp_full_out[i,])
++ 	sp_advice_in_vec[i] <- mean(sp_advice_in[i,])
++ 	sp_advice_out_vec[i] <- mean(sp_advice_out[i,])
++ 	sp_friendship_in_vec[i] <- mean(sp_friendship_in[i,])
++ 	sp_friendship_out_vec[i] <- mean(sp_friendship_out[i,])
++ 	sp_reports_to_in_vec[i] <- mean(sp_reports_to_in[i,])
++ 	sp_reports_to_out_vec[i] <- mean(sp_reports_to_out[i,])
++ }
+> 
+> # Next, we assemble all of the vectors of node-levelvalues into a 
+> # single data frame, which we can export as a CSV to our working
+> # directory.
+> node_stats_df <- cbind(deg_full_in,
++                        deg_full_out,
++                        deg_advice_in,
++                        deg_advice_out,
++                        deg_friendship_in,
++                        deg_friendship_out,
++                        deg_reports_to_in,
++                        deg_reports_to_out, 
++ 
++                        reach_full_in_vec, 
++                        reach_full_out_vec, 
++                        reach_advice_in_vec, 
++                        reach_advice_out_vec, 
++                        reach_friendship_in_vec, 
++                        reach_friendship_out_vec, 
++                        reach_reports_to_in_vec, 
++                        reach_reports_to_out_vec, 
++ 
++                        sp_full_in_vec, 
++                        sp_full_out_vec, 
++                        sp_advice_in_vec, 
++                        sp_advice_out_vec, 
++                        sp_friendship_in_vec, 
++                        sp_friendship_out_vec, 
++                        sp_reports_to_in_vec, 
++                        sp_reports_to_out_vec)
+> 
+> write.csv(node_stats_df, 'krack_node_stats.csv')
+> 
+> # Question #1 - What do these statistics tell us about
+> # each network and its individuals in general? 
+> # QQQ THEN IN THE NEXT SECTION, CAN WE GENERATE AN AVG/STDEV OF DEGREE, GEODESICS, AND REACH? THE LATTER REQUIRES DICHOTIMIZATION SO WE CAN GET %REACH... 
+> # MN_QQQ DONE; SEE BELOW
+> ### 
+> # 3. NETWORK-LEVEL STATISTICS
+> ###
+> 
+> # Many initial analyses of networks begin with distances and reach, 
+> # and then move towards global summary statistics of the network. 
+> #
+> # As a reminder, entering a question mark followed by a function 
+> # name (e.g., ?graph.density) pulls up the help file for that function.
+> # This can be helpful to understand how, exactly, stats are calculated.
+> 
+> # QQQ HERE IT WOULD HELP TO REMIND THEM OF THE HELP FUNCTION AND HOW TO RUN IT TO DETERMINE HOW THESE STATS ARE CALCULATED 
+> # MN_QQQ DONE
+> 
+> # Degree
+> mean(deg_full_in)
+[1] 11.04762
+> sd(deg_full_in)
+[1] 3.639728
+> mean(deg_full_out)
+[1] 11.04762
+> sd(deg_full_out)
+[1] 4.944453
+> 
+> mean(deg_advice_in)
+[1] 9.047619
+> sd(deg_advice_in)
+[1] 4.067876
+> mean(deg_advice_out)
+[1] 9.047619
+> sd(deg_advice_out)
+[1] 5.454138
+> 
+> mean(deg_friendship_in)
+[1] 4.857143
+> sd(deg_friendship_in)
+[1] 2.220039
+> mean(deg_friendship_out)
+[1] 4.857143
+> sd(deg_friendship_out)
+[1] 4.475329
+> 
+> mean(deg_reports_to_in)
+[1] 0.952381
+> sd(deg_reports_to_in)
+[1] 1.935877
+> mean(deg_reports_to_out)
+[1] 0.952381
+> sd(deg_reports_to_out)
+[1] 0.2182179
+> 
+> 
+> # Shortest paths
+> # ***Why do in and out come up with the same results?
+> # MN_*** I believe in and out shortest paths are simply transposes of one another; thus, when we compute statistics across the whole network they have to be the same.
+> mean(sp_full_in[which(sp_full_in != Inf)])
+[1] 1.38322
+> sd(sp_full_in[which(sp_full_in != Inf)])
+[1] 0.584333
+> mean(sp_full_out[which(sp_full_out != Inf)])
+[1] 1.38322
+> sd(sp_full_out[which(sp_full_out != Inf)])
+[1] 0.584333
+> 
+> mean(sp_advice_in[which(sp_advice_in != Inf)])
+[1] 1.562358
+> sd(sp_advice_in[which(sp_advice_in != Inf)])
+[1] 0.7206928
+> mean(sp_advice_out[which(sp_advice_out != Inf)])
+[1] 1.562358
+> sd(sp_advice_out[which(sp_advice_out != Inf)])
+[1] 0.7206928
+> 
+> mean(sp_friendship_in[which(sp_friendship_in != Inf)])
+[1] 1.992519
+> sd(sp_friendship_in[which(sp_friendship_in != Inf)])
+[1] 0.991183
+> mean(sp_friendship_out[which(sp_friendship_out != Inf)])
+[1] 1.992519
+> sd(sp_friendship_out[which(sp_friendship_out != Inf)])
+[1] 0.991183
+> 
+> mean(sp_reports_to_in[which(sp_reports_to_in != Inf)])
+[1] 0.9122807
+> sd(sp_reports_to_in[which(sp_reports_to_in != Inf)])
+[1] 0.8080113
+> mean(sp_reports_to_out[which(sp_reports_to_out != Inf)])
+[1] 0.9122807
+> sd(sp_reports_to_out[which(sp_reports_to_out != Inf)])
+[1] 0.8080113
+> 
+> # Reachability
+> mean(reach_full_in[which(reach_full_in != Inf)])
+[1] 1
+> sd(reach_full_in[which(reach_full_in != Inf)])
+[1] 0
+> mean(reach_full_out[which(reach_full_out != Inf)])
+[1] 1
+> sd(reach_full_out[which(reach_full_out != Inf)])
+[1] 0
+> 
+> mean(reach_advice_in[which(reach_advice_in != Inf)])
+[1] 1
+> sd(reach_advice_in[which(reach_advice_in != Inf)])
+[1] 0
+> mean(reach_advice_out[which(reach_advice_out != Inf)])
+[1] 1
+> sd(reach_advice_out[which(reach_advice_out != Inf)])
+[1] 0
+> 
+> mean(reach_friendship_in[which(reach_friendship_in != Inf)])
+[1] 0.909297
+> sd(reach_friendship_in[which(reach_friendship_in != Inf)])
+[1] 0.2875124
+> mean(reach_friendship_out[which(reach_friendship_out != Inf)])
+[1] 0.909297
+> sd(reach_friendship_out[which(reach_friendship_out != Inf)])
+[1] 0.2875124
+> 
+> mean(reach_reports_to_in[which(reach_reports_to_in != Inf)])
+[1] 0.1292517
+> sd(reach_reports_to_in[which(reach_reports_to_in != Inf)])
+[1] 0.3358593
+> mean(reach_reports_to_out[which(reach_reports_to_out != Inf)])
+[1] 0.1292517
+> sd(reach_reports_to_out[which(reach_reports_to_out != Inf)])
+[1] 0.3358593
+> 
+> # Density 
+> graph.density(krack_full)
+[1] 0.552381
+> graph.density(krack_advice)
+[1] 0.4523810
+> graph.density(krack_friendship)
+[1] 0.2428571
+> graph.density(krack_reports_to)
+[1] 0.04761905
+> 
+> # Reciprocity
+> reciprocity(krack_full)
+[1] 0.4591195
+> reciprocity(krack_advice)
+[1] 0.3103448
+> reciprocity(krack_friendship)
+[1] 0.2911392
+> reciprocity(krack_reports_to)
+[1] 0
+> 
+> # Transitivity
+> transitivity(krack_full)
+[1] 0.7863578
+> transitivity(krack_advice)
+[1] 0.7345088
+> transitivity(krack_friendship)
+[1] 0.4714946
+> transitivity(krack_reports_to)
+[1] 0
+> 
+> # Triad census. Here we'll first build a vector of labels for 
+> # the different triad types. Then we'll combine this vector
+> # with the triad censuses for the different networks, which 
+> # we'll export as a CSV.
+> # QQQ HOW WOULD I OUTPUT ANY OF THESE RESULTS AS A VECTOR TO BE USED ELSEWHERE? (EXCEL or even a growing file that stores all these results and appends them) ALSO WHERE ARE THE EXPECTED # OF TRIADS FROM A RANDOM GRAPH OF THE SAME # TIES
+> # MN_QQQ DONE; SEE BELOW
+> # *** is there a key output on what each column means in triadic terms? i.e., where are the triad Labels?
+> # MN_*** Done.
+> census_labels = c('003',
++                   '012',
++                   '102',
++                   '021D',
++                   '021U',
++                   '021C',
++                   '111D',
++                   '111U',
++                   '030T',
++                   '030C',
++                   '201',
++                   '120D',
++                   '120U',
++                   '120C',
++                   '210',
++                   '300')
+> tc_full <- triad.census(krack_full)
+> tc_advice <- triad.census(krack_advice)
+> tc_friendship <- triad.census(krack_friendship)
+> tc_reports_to <- triad.census(krack_reports_to)
+> 
+> triad_df <- data.frame(census_labels,
++                        tc_full, 
++                        tc_advice, 
++                        tc_friendship,
++                        tc_reports_to)
+> triad_df
+   census_labels tc_full tc_advice tc_friendship tc_reports_to
+1            003      29        74           376          1003
+2            012      99       153           366           274
+3            102      93        90           143             0
+4           021D      90       160           114             0
+5           021U      57        86            34            37
+6           021C      28        49            35            16
+7           111D      72        59            39             0
+8           111U     130       101           101             0
+9           030T     121       190            23             0
+10          030C       0         2             0             0
+11           201     121        72            20             0
+12          120D      77        62            16             0
+13          120U      98        78            25             0
+14          120C      31        17             9             0
+15           210     208       107            23             0
+16           300      76        30             6             0
+> 
+> # To export any of these vectors to a CSV for use in another program, simply
+> # use the write.csv() command:
+> write.csv(triad_df, 'krack_triads.csv')
+> 
+> # Question #2 - (a) How do the three networks differ on network statictics? 
+> # (b) What does the triad census tell us? Can you calculate the likelihood of
+> # any triad's occurrence? (c) See the back of Wasserman and Faust and its section
+> # on triads. Calculate the degree of clustering and hierarchy in Excel. 
+> # What do we learn from that?
+> 
+> 
+> 
+> ### 
+> # 4. HETEROGENEITY 
+> ###
+> 
+> # Miller and McPherson write about processes of homophily and
+> # here we take a brief look at one version of this issue. 
+> # In particular, we look at the extent to which each actor's
+> # "associates" (friend, advisor, boos) are heterogenous or not.
+> 
+> # We'll use a statistic called the IQV, or Index of Qualitative
+> # Variation. This is just an implementation of Blau's Index of
+> # Heterogeneity (known to economists as the Herfindahl-Hirschman
+> # index), normalized so that perfect heterogeneity (i.e., equal 
+> # distribution across categories) equals 1.
+> 
+> # NOTE that this code only works with categorical variables that 
+> # have been numerically coded to integer values that ascend
+> # sequentially from 0; you may have to recode your data to get this
+> # to work properly.
+> get_iqvs <- function(graph, attribute) {
++ 	mat <- get.adjacency(graph)
++ 
++ 	attr_levels = get.vertex.attribute(graph,
++ 	                                   attribute,
++ 	                                   V(graph))
++ 	
++ 	num_levels = length(unique(attr_levels))
++ 	iqvs = rep(0, nrow(mat))
++ 
++ 	# loop through each actor in the network
++ 	for (ego in 1:nrow(mat)) {
++ 		
++ 		# initialize actor-specific variables
++ 		alter_attr_counts = rep(0, num_levels)
++ 		num_alters_this_ego = 0
++ 		sq_fraction_sum = 0
++ 
++ 		# loop through each possible alter
++ 		for (alter in 1:ncol(mat)) {
++ 			
++ 			# only examine alters that are actually tied to ego
++ 			if (mat[ego, alter] == 1) {
++ 				
++ 				num_alters_this_ego = num_alters_this_ego + 1
++ 
++ 				# get the alter's level on the attribute 
++ 				alter_attr = get.vertex.attribute(graph, 
++ 				    attribute, (alter - 1))
++ 
++ 				# increment the count of alters with this level
++ 				# of the attribute by 1
++ 				alter_attr_counts[alter_attr + 1] =
++ 				    alter_attr_counts[alter_attr + 1] + 1
++ 			}
++ 		}
++ 
++ 		# now that we're done looping through all of the alters,
++ 		# get the squared fraction for each level of the attribute
++ 		# out of the total number of attributes
++ 		for (i in 1:num_levels) {
++ 			attr_fraction = alter_attr_counts[i] /
++ 			    num_alters_this_ego
++ 			sq_fraction_sum = sq_fraction_sum + attr_fraction ^ 2
++ 		}
++ 		
++ 		# now we can compute the ego's blau index...
++ 		blau_index = 1 - sq_fraction_sum
++ 		
++ 		# and the ego's IQV, which is just a normalized blau index
++ 		iqvs[ego] = blau_index / (1 - (1 / num_levels))
++ 	}
++ 	return(iqvs)
++ }
+> 
+> 
+> # For this data set, we'll look at homophily across departments, 
+> # which is already coded 0-4, so no recoding is needed. 
+> 
+> advice_iqvs <- get_iqvs(krack_advice, 'DEPT')
+> advice_iqvs
+ [1] 0.7638889 0.5555556 0.9555556 0.8680556 0.9666667 0.0000000 0.8203125
+ [8] 0.8984375 0.9171598 0.8673469 0.5555556 0.6250000 0.7638889 0.9375000
+[15] 0.9375000 0.6250000 0.7000000 0.8650519 0.8471074 0.8854167 0.9297521
+> 
+> friendship_iqvs <- get_iqvs(krack_friendship, 'DEPT')
+> friendship_iqvs
+ [1] 0.6000000 0.8333333 0.0000000 0.6250000 0.8673469 0.8333333       NaN
+ [8] 0.0000000       NaN 0.7142857 0.8431953 0.6250000 0.6250000 0.6250000
+[15] 0.7031250 0.0000000 0.9182099 0.0000000 0.7716049 0.0000000 0.7812500
+> 
+> reports_to_iqvs <- get_iqvs(krack_reports_to, 'DEPT')
+> reports_to_iqvs
+ [1]   0   0   0   0   0   0 NaN   0   0   0   0   0   0   0   0   0   0   0   0
+[20]   0   0
+> 
+> # Question #3 - What does the herfindahl index reveal about 
+> # attribute sorting in networks? What does it mean for each network?
+> 
+> 
+> #####
+> # Extra-credit: What might be a better way to test the occurrence 
+> # of homophily or segregation in a network? How might we code that in R?
+> #####
