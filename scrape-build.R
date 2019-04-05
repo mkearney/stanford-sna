@@ -1,40 +1,35 @@
-library(rtweet)
 library(tfse)
-x <- xml2::read_html("https://sna.stanford.edu/rlabs.php")
 library(rvest)
 library(tidyverse)
+
+## scrape initial page/get links
+x <- xml2::read_html("https://sna.stanford.edu/rlabs.php")
 x %>%
-  html_nodes("a") %>%
-  html_attr("href") %>%
+  rvest::html_nodes("a") %>%
+  rvest::html_attr("href") %>%
   grep("l=\\d", ., value = TRUE) %>%
-  paste0("http://sna.stanford.edu/", .) -> u
+  paste0("http://sna.stanford.edu/", .) %>%
+  purrr::map(xml2::read_html) -> l
 
-map(u, xml2::read_html) -> l
-
-l <- map2(l, u, ~ {
-  attr(.x, "base_url") <- .y
-  .x
-})
-
-
-
-f <- function(x) {
-  u <- rvest::html_nodes(x, "a") %>% 
-    html_attr("href") %>% 
-    url_absolute(xml_url(x))
-  grep("\\.php$|\\.html$|/$|content_main$", unique(u), value = TRUE, invert = TRUE)
+## function to get content/lab links
+get_links <- function(x) {
+  u <- rvest::html_nodes(x, "a") %>%
+    rvest::html_attr("href") %>%
+    rvest::url_absolute(rvest::xml_url(x))
+  grep("\\.php$|\\.html$|/$|content_main$", unique(u),
+    value = TRUE, invert = TRUE)
 }
 
+## apply to each lab page
 r <- map(l, f)
+
+## convert each to a tibble along with lab numbers
 for (i in seq_along(r)) {
   r[[i]] <- tibble::tibble(lab = i, link = r[[i]])
 }
-r <- bind_rows(r)
 
-dir.create("~/R/stanford-sna")
-setwd("~/R/stanford-sna")
-
-build_course <- function(x) {
+## function to build lab dir
+build_lab <- function(x) {
   l <- x$lab[1]
   u <- x$link
   lab_folder <- paste0("lab_", l)
@@ -44,6 +39,5 @@ build_course <- function(x) {
   }
 }
 
-
-map(split(r, r$lab)[-1], build_course)
-build_course(filter(r, lab== 1))
+## apply function to build and fill lab folders 1-9
+purrr::map(r, build_lab)
